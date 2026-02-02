@@ -1,0 +1,1 @@
+# Seed | Nuxt Front App
