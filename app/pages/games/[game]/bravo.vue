@@ -122,8 +122,15 @@ onMounted(async () => {
   window.addEventListener("error", __bravo_onError);
   window.addEventListener("unhandledrejection", __bravo_onRejection);
 
+  // S'assurer que auth est initialisé
+  await auth.initAuth();
+
+  console.log("[BRAVO] levelId:", levelId.value, "dayParam:", dayParam.value);
+  console.log("[BRAVO] isLoggedIn:", auth.isLoggedIn.value, "userId:", auth.user.value?.id);
+
   // 1. Essayer de récupérer depuis sessionStorage (cas normal après victoire)
   const raw = sessionStorage.getItem(`seed:bravo:${levelId.value}`);
+  console.log("[BRAVO] sessionStorage raw:", raw ? "found" : "not found");
   if (raw) {
     try {
       bravoData.value = JSON.parse(raw) as BravoData;
@@ -137,18 +144,30 @@ onMounted(async () => {
 
   // 2. Si pas dans sessionStorage, récupérer depuis la base de données
   const { $supabase } = useNuxtApp();
+  
+  // Vérifier que levelId est présent
+  if (!levelId.value) {
+    console.error("[BRAVO] No levelId in query params");
+    loading.value = false;
+    return;
+  }
+
   try {
     // D'abord récupérer les données du niveau (toujours disponible)
-    const { data: levelData } = await $supabase
+    console.log("[BRAVO] Fetching level data for id:", levelId.value);
+    const { data: levelData, error: levelError } = await $supabase
       .from("levels")
       .select("data, day")
       .eq("id", levelId.value)
       .maybeSingle();
 
+    console.log("[BRAVO] Level data:", levelData, "error:", levelError);
+
     // Ensuite récupérer le play si l'utilisateur est connecté
     let play = null;
     if (auth.isLoggedIn.value && auth.user.value?.id) {
-      const { data: playData } = await $supabase
+      console.log("[BRAVO] Fetching play for user:", auth.user.value.id);
+      const { data: playData, error: playError } = await $supabase
         .from("plays")
         .select("time_spent_seconds, moves, completed_at")
         .eq("level_id", levelId.value)
@@ -158,6 +177,7 @@ onMounted(async () => {
         .limit(1)
         .maybeSingle();
       play = playData;
+      console.log("[BRAVO] Play data:", playData, "error:", playError);
     }
 
     if (levelData) {
@@ -171,7 +191,10 @@ onMounted(async () => {
         rowCounts: levelContent.rowCounts ?? [],
         colCounts: levelContent.colCounts ?? [],
       };
+      console.log("[BRAVO] bravoData set:", bravoData.value);
       startSolutionAnimation();
+    } else {
+      console.log("[BRAVO] No level data found");
     }
   } catch (error) {
     console.error("[BRAVO] Erreur lors du chargement:", error);
