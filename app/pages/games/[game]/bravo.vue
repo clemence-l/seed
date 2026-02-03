@@ -19,6 +19,7 @@ declare global {
 
 const route = useRoute();
 const router = useRouter();
+const auth = useAuth();
 
 const gameName = computed(() => route.params.game as string);
 const gameDisplayName = computed(() => {
@@ -137,28 +138,35 @@ onMounted(async () => {
   // 2. Si pas dans sessionStorage, récupérer depuis la base de données
   const { $supabase } = useNuxtApp();
   try {
-    const { data: play } = await $supabase
-      .from("plays")
-      .select("time_spent_seconds, moves, completed_at")
-      .eq("level_id", levelId.value)
-      .eq("success", true)
-      .order("completed_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
+    // D'abord récupérer les données du niveau (toujours disponible)
     const { data: levelData } = await $supabase
       .from("levels")
       .select("data, day")
       .eq("id", levelId.value)
       .maybeSingle();
 
-    if (play && levelData) {
+    // Ensuite récupérer le play si l'utilisateur est connecté
+    let play = null;
+    if (auth.isLoggedIn.value && auth.user.value?.id) {
+      const { data: playData } = await $supabase
+        .from("plays")
+        .select("time_spent_seconds, moves, completed_at")
+        .eq("level_id", levelId.value)
+        .eq("user_id", auth.user.value.id)
+        .eq("success", true)
+        .order("completed_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      play = playData;
+    }
+
+    if (levelData) {
       const levelContent = levelData.data as DanmenLevel;
       bravoData.value = {
         grid: levelContent.solution ?? [],
-        timeSpentSeconds: play.time_spent_seconds ?? 0,
-        moves: play.moves ?? 0,
-        day: levelData.day,
+        timeSpentSeconds: play?.time_spent_seconds ?? 0,
+        moves: play?.moves ?? 0,
+        day: levelData.day || dayParam.value,
         difficulty: levelContent.difficulty ?? 1,
         rowCounts: levelContent.rowCounts ?? [],
         colCounts: levelContent.colCounts ?? [],
