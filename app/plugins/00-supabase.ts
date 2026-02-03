@@ -18,9 +18,10 @@ export default defineNuxtPlugin(() => {
     supabaseAnonKey,
     {
       auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
+        // Côté serveur, pas de persistance de session
+        persistSession: import.meta.client,
+        autoRefreshToken: import.meta.client,
+        detectSessionInUrl: import.meta.client,
       },
     },
   );
