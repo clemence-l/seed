@@ -2,7 +2,6 @@
 /**
  * Page Profil - Version refactorisée
  */
-import type { TypedSupabaseClient } from "../../types/supabase";
 import ProfileCard from "../components/profile/ProfileCard.vue";
 import ProfileAccountInfo from "../components/profile/ProfileAccountInfo.vue";
 import UiAlert from "../components/ui/Alert.vue";
@@ -17,7 +16,7 @@ const messages = useMessages();
 const avatarInput = ref<HTMLInputElement | null>(null);
 const uploadingAvatar = ref(false);
 const streak = ref(0);
-const totalWins = ref(0);
+const streakCount = ref(0);
 const loading = ref(true);
 const localDisplayName = ref<string | null>(null);
 const pendingEmail = ref<string | null>(null);
@@ -38,18 +37,8 @@ onMounted(async () => {
   }
   try {
     const plantState = await progress.getPlantState();
-    streak.value = plantState.streak;
-    const user = auth.user.value;
-    if (user) {
-      const nuxtApp = useNuxtApp();
-      const supabase = nuxtApp.$supabase as TypedSupabaseClient;
-      const { count } = await supabase
-        .from("plays")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .eq("success", true);
-      totalWins.value = count ?? 0;
-    }
+    streak.value = plantState.totalStreak ?? 0;
+    streakCount.value = plantState.plants.length;
   } catch (e) {
     console.error("Erreur chargement stats:", e);
   } finally {
@@ -160,7 +149,7 @@ async function handleSavePassword(password: string) {
               :display-name="displayName"
               :avatar-url="auth.profile.value?.avatar_url"
               :streak="streak"
-              :total-wins="totalWins"
+              :streak-count="streakCount"
               :is-uploading="uploadingAvatar"
               @upload-avatar="triggerAvatarUpload"
             />
@@ -170,7 +159,7 @@ async function handleSavePassword(password: string) {
               accept="image/*"
               class="hidden"
               @change="handleAvatarChange"
-            >
+            />
           </div>
 
           <div class="lg:col-span-8 space-y-6">

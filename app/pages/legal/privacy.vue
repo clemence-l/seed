@@ -36,19 +36,16 @@ useHead({ title: "Seed | Politique de confidentialité" });
             Lors de votre utilisation de Seed, nous collectons les données
             suivantes :
           </p>
-          <ul class="space-y-3 text-dark-500/70">
-            <li class="pl-5 relative">
-              <span class="absolute left-0 top-1 text-dark-500/50">•</span>
-              <strong>Données de compte :</strong> email, nom d’utilisateur, mot
+          <ul class="mt-4 space-y-2 text-dark-500/70">
+            <li>
+              <strong>Données de compte :</strong> email, nom d'utilisateur, mot
               de passe (chiffré)
             </li>
-            <li class="pl-5 relative">
-              <span class="absolute left-0 top-1 text-dark-500/50">•</span>
+            <li>
               <strong>Données de progression :</strong> niveaux complétés,
               scores, temps de jeu
             </li>
-            <li class="pl-5 relative">
-              <span class="absolute left-0 top-1 text-dark-500/50">•</span>
+            <li>
               <strong>Données techniques :</strong> adresse IP, type de
               navigateur, appareil utilisé (à des fins de sécurité)
             </li>
@@ -64,23 +61,11 @@ useHead({ title: "Seed | Politique de confidentialité" });
           <p class="text-dark-500/70 leading-relaxed mb-4">
             Vos données sont utilisées pour :
           </p>
-          <ul class="space-y-3 text-dark-500/70">
-            <li class="pl-5 relative">
-              <span class="absolute left-0 top-1 text-dark-500/50">•</span>Gérer
-              votre compte et authentification
-            </li>
-            <li class="pl-5 relative">
-              <span class="absolute left-0 top-1 text-dark-500/50">•</span
-              >Sauvegarder et synchroniser votre progression
-            </li>
-            <li class="pl-5 relative">
-              <span class="absolute left-0 top-1 text-dark-500/50">•</span
-              >Améliorer l’expérience utilisateur et le service
-            </li>
-            <li class="pl-5 relative">
-              <span class="absolute left-0 top-1 text-dark-500/50">•</span
-              >Assurer la sécurité de la plateforme
-            </li>
+          <ul class="mt-4 space-y-2 text-dark-500/70">
+            <li>Gérer votre compte et authentification</li>
+            <li>Sauvegarder et synchroniser votre progression</li>
+            <li>Améliorer l'expérience utilisateur et le service</li>
+            <li>Assurer la sécurité de la plateforme</li>
           </ul>
         </section>
 
@@ -93,7 +78,7 @@ useHead({ title: "Seed | Politique de confidentialité" });
           <p class="text-dark-500/70 leading-relaxed">
             Vos données sont stockées de manière sécurisée sur les serveurs de
             Supabase, conformément au RGPD. Les mots de passe sont chiffrés et
-            ne sont jamais stockés en clair. L’accès aux données est strictement
+            ne sont jamais stockés en clair. L'accès aux données est strictement
             limité et protégé par des mesures de sécurité appropriées.
           </p>
         </section>
@@ -104,7 +89,7 @@ useHead({ title: "Seed | Politique de confidentialité" });
           <h2 class="text-xl font-semibold text-dark-500 mb-3">Cookies</h2>
           <p class="text-dark-500/70 leading-relaxed">
             Seed utilise uniquement des cookies essentiels au fonctionnement du
-            service (authentification, session). Nous n’utilisons pas de cookies
+            service (authentification, session). Nous n'utilisons pas de cookies
             de tracking publicitaire ou de cookies tiers à des fins marketing.
           </p>
         </section>
@@ -130,23 +115,19 @@ useHead({ title: "Seed | Politique de confidentialité" });
           <p class="text-dark-500/70 leading-relaxed mb-4">
             Conformément au RGPD, vous disposez des droits suivants :
           </p>
-          <ul class="space-y-3 text-dark-500/70">
-            <li class="pl-5 relative">
-              <span class="absolute left-0 top-1 text-dark-500/50">•</span>
-              <strong>Droit d’accès :</strong> obtenir une copie de vos données
+          <ul class="mt-4 space-y-2 text-dark-500/70">
+            <li>
+              <strong>Droit d'accès :</strong> obtenir une copie de vos données
             </li>
-            <li class="pl-5 relative">
-              <span class="absolute left-0 top-1 text-dark-500/50">•</span>
+            <li>
               <strong>Droit de rectification :</strong> corriger vos données
               inexactes
             </li>
-            <li class="pl-5 relative">
-              <span class="absolute left-0 top-1 text-dark-500/50">•</span>
-              <strong>Droit à l’effacement :</strong> demander la suppression de
+            <li>
+              <strong>Droit à l'effacement :</strong> demander la suppression de
               votre compte
             </li>
-            <li class="pl-5 relative">
-              <span class="absolute left-0 top-1 text-dark-500/50">•</span>
+            <li>
               <strong>Droit à la portabilité :</strong> récupérer vos données
               dans un format lisible
             </li>
@@ -162,9 +143,7 @@ useHead({ title: "Seed | Politique de confidentialité" });
           </p>
         </section>
 
-        <section
-          class="py-12 border-b border-[rgba(17,24,39,0.5)] last:border-b-0"
-        >
+        <section class="relative py-12">
           <h2 class="text-xl font-semibold text-dark-500 mb-3">
             Conservation des données
           </h2>
@@ -194,7 +173,7 @@ useHead({ title: "Seed | Politique de confidentialité" });
               d="M15 19l-7-7 7-7"
             />
           </svg>
-          Retour à l’accueil
+          Retour à l'accueil
         </NuxtLink>
       </div>
     </article>
@@ -202,82 +181,5 @@ useHead({ title: "Seed | Politique de confidentialité" });
 </template>
 
 <style scoped>
-article h1 {
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
-
-.prose > section {
-  padding-bottom: 1.25rem;
-  margin-bottom: 1.25rem;
-  border-bottom: 1px solid rgba(3, 7, 18, 0.06);
-}
-
-.prose > section:last-child {
-  border-bottom: none;
-  margin-bottom: 0;
-  padding-bottom: 0;
-}
-</style>
-
-<style scoped>
-article h1 {
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
-
-/* Style global pour les pages légales : bullets monochromes, texte unifié */
-.prose {
-  max-width: 65ch;
-  font-size: 0.95rem;
-  color: rgba(17, 24, 39, 0.85);
-}
-
-.prose p,
-.prose li {
-  color: rgba(17, 24, 39, 0.72);
-  line-height: 1.6;
-}
-
-/* Remplacer bullets colorés par un bullet discret monochrome */
-.prose ul {
-  list-style: none;
-  padding-left: 0;
-}
-
-.prose ul li {
-  position: relative;
-  padding-left: 1.25rem;
-}
-
-.prose ul li::before {
-  content: "•";
-  position: absolute;
-  left: 0;
-  top: 0.15rem;
-  color: rgba(17, 24, 39, 0.5); /* dark-500/50 */
-  font-size: 0.9rem;
-  line-height: 1;
-}
-
-/* Séparateurs full-width et plus visibles */
-.prose > section {
-  padding-bottom: 1rem;
-  margin-bottom: 1rem;
-}
-
-.prose > section:not(:last-child)::after {
-  content: "";
-  display: block;
-  width: 100vw;
-  height: 1px;
-  background: rgba(17, 24, 39, 0.5); /* dark-500/50 */
-  margin-left: calc(50% - 50vw);
-  margin-top: 1rem;
-}
-
-.prose > section:last-child {
-  margin-bottom: 0;
-  padding-bottom: 0;
-}
+/* Placeholder style block to ensure PostCSS processes valid CSS for this SFC. */
 </style>

@@ -43,7 +43,7 @@ useHead({ title: "Seed | Conditions Générales d’Utilisation" });
             <li>• Jouer à différents puzzles logiques (Danmen, etc.)</li>
             <li>• Créer un compte pour sauvegarder leur progression</li>
             <li>• Suivre leurs statistiques et leur évolution</li>
-            <li>• Débloquer des niveaux de difficulté croissante</li>
+            <li>• Débloquer de nouveaux jeux</li>
           </ul>
         </section>
 
@@ -222,63 +222,5 @@ useHead({ title: "Seed | Conditions Générales d’Utilisation" });
 </template>
 
 <style scoped>
-article h1 {
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
-
-/* Style global pour les pages légales : bullets monochromes, texte unifié */
-.prose {
-  max-width: 65ch;
-  font-size: 0.95rem;
-  color: rgba(17, 24, 39, 0.85);
-}
-
-.prose p,
-.prose li {
-  color: rgba(17, 24, 39, 0.72);
-  line-height: 1.6;
-}
-
-/* Remplacer bullets colorés par un bullet discret monochrome */
-.prose ul {
-  list-style: none;
-  padding-left: 0;
-}
-
-.prose ul li {
-  position: relative;
-  padding-left: 1.25rem;
-}
-
-.prose ul li::before {
-  content: "•";
-  position: absolute;
-  left: 0;
-  top: 0.15rem;
-  color: rgba(17, 24, 39, 0.5); /* dark-500/50 */
-  font-size: 0.9rem;
-  line-height: 1;
-}
-
-/* Séparateurs full-width et plus visibles */
-.prose > section {
-  padding-bottom: 1rem;
-  margin-bottom: 1rem;
-}
-
-.prose > section:not(:last-child)::after {
-  content: "";
-  display: block;
-  width: 100vw;
-  height: 1px;
-  background: rgba(17, 24, 39, 0.5); /* dark-500/50 */
-  margin-left: calc(50% - 50vw);
-  margin-top: 1rem;
-}
-
-.prose > section:last-child {
-  margin-bottom: 0;
-  padding-bottom: 0;
-}
+/* Placeholder style block to ensure PostCSS processes valid CSS for this SFC. */
 </style>

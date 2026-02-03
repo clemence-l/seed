@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { DanmenLevel, CellState } from "../../../lib/games/danmen/types";
-import type { DanmenBoardExposed } from "../../components/DanmenBoard.vue";
+import type { DanmenBoardExposed } from "../../../components/DanmenBoard.vue";
 
 // Utiliser le layout minimal (sans header/footer/nav)
 definePageMeta({
@@ -304,8 +304,13 @@ const playId = ref<string | null>(null);
 const router = useRouter();
 
 async function handleComplete(): Promise<void> {
+  console.log("[GamePage] handleComplete called");
   const id = currentLevelId.value;
-  if (!id) return;
+  if (!id) {
+    console.log("[GamePage] No level id, returning");
+    return;
+  }
+  console.log("[GamePage] Level id:", id);
   isCompleted.value = true;
 
   // stop + persist "completed"
@@ -316,18 +321,33 @@ async function handleComplete(): Promise<void> {
   // Récupérer stats du board
   const movesCount = boardRef.value?.getMoves?.() ?? 0;
   const gridSnapshot: CellState[][] = boardRef.value?.getGrid?.() ?? [];
+  console.log(
+    "[GamePage] Stats: moves=",
+    movesCount,
+    "time=",
+    elapsedSeconds.value,
+  );
 
   // Enregistrer le play en base UNIQUEMENT si connecté
   if (auth.isLoggedIn.value && playId.value) {
+    console.log("[GamePage] Saving play to DB, playId=", playId.value);
     try {
       await plays.completePlay(playId.value, id, {
         timeSpentSeconds: elapsedSeconds.value,
         moves: movesCount,
         success: true,
       });
-    } catch {
-      // Erreur lors de la sauvegarde du play (silent)
+      console.log("[GamePage] Play saved successfully");
+    } catch (e) {
+      console.error("[GamePage] Error saving play:", e);
     }
+  } else {
+    console.log(
+      "[GamePage] Not saving play - isLoggedIn:",
+      auth.isLoggedIn.value,
+      "playId:",
+      playId.value,
+    );
   }
 
   // Sauvegarder les stats pour la page bravo en sessionStorage
@@ -342,10 +362,12 @@ async function handleComplete(): Promise<void> {
       colCounts: level.value?.colCounts ?? [],
     };
     sessionStorage.setItem(`seed:bravo:${id}`, JSON.stringify(bravoData));
+    console.log("[GamePage] Bravo data saved to sessionStorage");
   }
 
   // Naviguer vers la page bravo
   const targetPath = `/games/${gameName.value}/bravo`;
+  console.log("[GamePage] Navigating to:", targetPath);
   await router.push({
     path: targetPath,
     query: { levelId: id, day: day.value },
@@ -416,17 +438,46 @@ const boardRef = ref<DanmenBoardExposed | null>(null);
           @dismiss="dismissLoginPrompt"
         />
 
-        <!-- Sous-header: difficulté + chrono -->
+        <!-- Sous-header: chrono -->
         <div
           class="w-full max-w-120 flex items-center justify-between mb-4 px-2"
         >
-          <div class="flex items-center gap-3 text-sm text-dark-500">
-            <span class="font-medium">Difficulté</span>
-            <div class="flex items-center gap-1">
-              <template v-for="n in level.difficulty ?? 1" :key="n">
-                <span class="w-2 h-2 rounded-full bg-dark-500/80" />
-              </template>
-            </div>
+          <div class="flex items-center gap-2">
+            <!-- Bouton pour sélectionner le mode rond -->
+            <button
+              aria-label="Mode rond"
+              class="w-10 h-10 flex items-center justify-center rounded border border-purple-500 bg-purple-500 hover:bg-purple-500/80 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 active:bg-purple-500/90 transition-all duration-200"
+              :class="{
+                'ring-2 ring-dark-500':
+                  boardRef?.getSelectedMode?.() === 'circle',
+              }"
+              @click="boardRef?.setSelectedMode?.('circle')"
+            >
+              <span class="w-2/5 h-2/5 rounded-full bg-light-500" />
+            </button>
+            <!-- Bouton pour sélectionner le mode croix -->
+            <button
+              aria-label="Mode croix"
+              class="w-10 h-10 flex items-center justify-center rounded border border-dark-500/30 hover:bg-dark-500/10 focus:outline-none focus:ring-2 focus:ring-dark-500 focus:ring-offset-2 active:bg-dark-500/20 transition-all duration-200"
+              :class="{
+                'ring-2 ring-dark-500':
+                  boardRef?.getSelectedMode?.() === 'cross',
+              }"
+              @click="boardRef?.setSelectedMode?.('cross')"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="w-6 h-6 text-dark-500"
+              >
+                <line x1="5" y1="5" x2="19" y2="19" />
+                <line x1="19" y1="5" x2="5" y2="19" />
+              </svg>
+            </button>
           </div>
 
           <div class="text-sm text-dark-500 flex items-center gap-2">

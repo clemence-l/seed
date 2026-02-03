@@ -331,7 +331,7 @@ onMounted(async () => {
 
     <!-- Carousel de plantes -->
     <div
-      v-else
+      v-else-if="plants.length > 0"
       class="plant-carousel flex-1 flex items-end justify-center pb-8 relative overflow-hidden"
     >
       <!-- Conteneur des plantes avec transition -->
@@ -670,6 +670,46 @@ onMounted(async () => {
       </div>
     </div>
 
+    <!-- Graine flottante quand aucun niveau joué -->
+    <div
+      v-else-if="!loading"
+      class="floating-seed-container flex-1 flex items-center justify-center"
+    >
+      <svg
+        class="floating-seed w-32 h-40 sm:w-40 sm:h-52"
+        viewBox="0 0 100 130"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <defs>
+          <radialGradient id="seedGradient" cx="30%" cy="30%">
+            <stop offset="0%" stop-color="#b39ddb" />
+            <stop offset="70%" stop-color="#9575cd" />
+            <stop offset="100%" stop-color="#7e57c2" />
+          </radialGradient>
+          <radialGradient id="seedHighlight" cx="35%" cy="25%">
+            <stop offset="0%" stop-color="#fff" stop-opacity="0.4" />
+            <stop offset="100%" stop-color="#fff" stop-opacity="0" />
+          </radialGradient>
+        </defs>
+        <!-- Corps de la graine -->
+        <ellipse cx="50" cy="75" rx="30" ry="45" fill="url(#seedGradient)" />
+        <!-- Reflet -->
+        <ellipse cx="40" cy="55" rx="12" ry="20" fill="url(#seedHighlight)" />
+        <!-- Petite pousse qui émerge -->
+        <path
+          d="M50 30 Q55 20 50 10 Q45 20 50 30"
+          fill="#a5d6a7"
+          opacity="0.8"
+        />
+        <path
+          d="M50 30 L50 35"
+          stroke="#8bc34a"
+          stroke-width="2"
+          stroke-linecap="round"
+        />
+      </svg>
+    </div>
+
     <!-- Overlay infos en bas (sans titre stage, streak en haut) -->
     <div
       v-if="!loading"
@@ -773,6 +813,26 @@ onMounted(async () => {
     #1a1a1a 60%,
     #131313 100%
   );
+}
+
+/* Graine flottante */
+.floating-seed-container {
+  position: relative;
+}
+
+.floating-seed {
+  animation: float-seed 3s ease-in-out infinite;
+  filter: drop-shadow(0 20px 40px rgba(149, 117, 205, 0.3));
+}
+
+@keyframes float-seed {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-3deg);
+  }
+  50% {
+    transform: translateY(-20px) rotate(3deg);
+  }
 }
 
 /* Décor hivernal - lueur glaçée subtile sur fond sombre */

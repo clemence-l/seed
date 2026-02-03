@@ -8,7 +8,7 @@ defineProps<{
   displayName: string;
   avatarUrl?: string | null;
   streak: number;
-  totalWins: number;
+  streakCount: number;
   isUploading?: boolean;
 }>();
 
@@ -43,13 +43,14 @@ const { getStageName, getBorderGradient, getBadgeClasses } = usePlantStage();
               :src="avatarUrl"
               alt="Avatar"
               class="w-full h-full object-cover"
-            >
+            />
             <NuxtImg
               v-else
               src="/img/profile.svg"
               alt="Avatar par défaut"
               class="w-11/12 h-11/12 object-contain"
-            /></div>
+            />
+          </div>
         </div>
         <div
           class="absolute inset-0 rounded-full bg-dark-500/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
@@ -67,8 +68,9 @@ const { getStageName, getBorderGradient, getBadgeClasses } = usePlantStage();
               stroke-linecap="round"
               stroke-linejoin="round"
             >
-            <circle cx="12" cy="13" r="4" />
-          </path></svg>
+              <circle cx="12" cy="13" r="4" />
+            </path>
+          </svg>
           <div
             v-else
             class="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"
@@ -94,13 +96,15 @@ const { getStageName, getBorderGradient, getBadgeClasses } = usePlantStage();
         class="rounded-xl bg-dark-500/5 border border-dark-500/10 p-4 text-center"
       >
         <p class="text-2xl font-bold text-dark-500">{{ streak }}</p>
-        <p class="text-xs text-dark-500/50">Jours de streak</p>
+        <p class="text-xs text-dark-500/50">
+          Streak actuel ({{ streak === 1 ? "jour" : "jours" }})
+        </p>
       </div>
       <div
         class="rounded-xl bg-dark-500/5 border border-dark-500/10 p-4 text-center"
       >
-        <p class="text-2xl font-bold text-dark-500">{{ totalWins }}</p>
-        <p class="text-xs text-dark-500/50">Niveaux réussis</p>
+        <p class="text-2xl font-bold text-dark-500">{{ streakCount }}</p>
+        <p class="text-xs text-dark-500/50">Nombre de streaks</p>
       </div>
     </div>
 

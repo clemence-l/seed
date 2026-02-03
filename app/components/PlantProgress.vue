@@ -61,7 +61,7 @@ const leafCount = computed(() => Math.min(Math.floor(props.stage / 2), 5));
     <div class="mt-2 text-center">
       <span class="text-sm font-medium text-dark-500"> Jour {{ stage }} </span>
       <span v-if="streak > 0" class="block text-xs text-dark-500/60">
-        🔥 {{ streak }} jours consécutifs
+        {{ streak }} jours consécutifs
       </span>
     </div>
   </div>

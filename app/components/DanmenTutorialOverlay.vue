@@ -88,7 +88,7 @@ const steps: TutorialStep[] = [
   {
     id: "cross",
     title: "Marquer une case vide",
-    text: "Clique 2 fois sur la case pour mettre une croix.",
+    text: "Sélectionne le mode croix puis clique sur la case.",
     gridSize: 3,
     givens: [
       // Toutes les cases sauf (1,1) sont des cases remplies bloquées
@@ -292,12 +292,29 @@ watch(currentStepIndex, () => {
   // reset drag helpers
   dragUsed.value = false;
   showDragHint.value = false;
+  // Définir le mode approprié pour chaque étape
+  // Étape 3 (index 2) = apprendre la croix → mode cross
+  // Autres étapes avec boutons → mode circle par défaut
+  if (currentStepIndex.value === 2) {
+    selectedMode.value = "cross";
+  } else if (currentStepIndex.value > 2) {
+    selectedMode.value = "circle";
+  } else {
+    selectedMode.value = "circle";
+  }
 });
 
 // --- Interaction avec la grille ---
 const isDragging = ref(false);
 const dragState = ref<CellState | null>(null);
 const dragUsed = ref(false);
+
+// Mode de sélection (circle/cross) - visible à partir de l'étape 3
+type SelectionMode = "toggle" | "circle" | "cross";
+const selectedMode = ref<SelectionMode>("circle");
+
+// Afficher les boutons de mode à partir de l'étape 3 (index 2)
+const showModeButtons = computed(() => currentStepIndex.value >= 2);
 const showDragHint = ref(false);
 
 function cellState(r: number, c: number): CellState {
@@ -305,6 +322,14 @@ function cellState(r: number, c: number): CellState {
 }
 
 function nextState(current: CellState): CellState {
+  if (selectedMode.value === "circle") {
+    // Mode cercle: toggle entre unknown et filled
+    return current === "filled" ? "unknown" : "filled";
+  } else if (selectedMode.value === "cross") {
+    // Mode croix: toggle entre unknown et empty
+    return current === "empty" ? "unknown" : "empty";
+  }
+  // Mode toggle (défaut): cycle normal
   if (current === "unknown") return "filled";
   if (current === "filled") return "empty";
   return "unknown";
@@ -483,6 +508,37 @@ onBeforeUnmount(() => {
             <p class="text-dark-500/80 text-sm text-center mb-4">
               {{ currentStep?.text }}
             </p>
+
+            <!-- Boutons de sélection de mode (à partir de l'étape 3) -->
+            <div v-if="showModeButtons" class="flex justify-center gap-2 mb-4">
+              <button
+                class="w-10 h-10 flex items-center justify-center rounded border border-purple-500 bg-purple-500 hover:bg-purple-500/80 focus:outline-none active:bg-purple-500/90 transition-all duration-200"
+                :class="{ 'ring-2 ring-dark-500': selectedMode === 'circle' }"
+                @click="selectedMode = 'circle'"
+                aria-label="Mode rond"
+              >
+                <span class="w-2/5 h-2/5 rounded-full bg-light-500" />
+              </button>
+              <button
+                class="w-10 h-10 flex items-center justify-center rounded border border-dark-500/30 hover:bg-dark-500/10 focus:outline-none active:bg-dark-500/20 transition-all duration-200"
+                :class="{ 'ring-2 ring-dark-500': selectedMode === 'cross' }"
+                @click="selectedMode = 'cross'"
+                aria-label="Mode croix"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="w-6 h-6 text-dark-500"
+                >
+                  <line x1="5" y1="5" x2="19" y2="19" />
+                  <line x1="19" y1="5" x2="5" y2="19" />
+                </svg>
+              </button>
+            </div>
 
             <!-- Grille de tutoriel -->
             <div

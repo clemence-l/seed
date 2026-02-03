@@ -44,8 +44,65 @@ type BravoData = {
 };
 
 const bravoData = ref<BravoData | null>(null);
-const showSolution = ref(false);
 const loading = ref(true);
+
+// Animation de la solution
+const animatedGrid = ref<CellState[][]>([]);
+const animationIndex = ref(0);
+let animationInterval: number | null = null;
+
+function startSolutionAnimation() {
+  if (!bravoData.value?.grid || bravoData.value.grid.length === 0) return;
+
+  const size = bravoData.value.grid.length;
+  // Initialiser grille vide
+  animatedGrid.value = Array.from({ length: size }, () =>
+    Array.from({ length: size }, () => "unknown" as CellState),
+  );
+  animationIndex.value = 0;
+
+  // Créer la séquence d'animation (toutes les cases à remplir)
+  const sequence: { r: number; c: number; state: CellState }[] = [];
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      const state = bravoData.value.grid[r]?.[c];
+      if (state && state !== "unknown") {
+        sequence.push({ r, c, state });
+      }
+    }
+  }
+
+  if (sequence.length === 0) return;
+
+  // Animation en boucle
+  animationInterval = window.setInterval(() => {
+    if (animationIndex.value < sequence.length) {
+      const cell = sequence[animationIndex.value];
+      if (cell && animatedGrid.value[cell.r]) {
+        animatedGrid.value[cell.r]![cell.c] = cell.state;
+      }
+      animationIndex.value++;
+    } else {
+      // Pause de 2 secondes avant de recommencer
+      setTimeout(() => {
+        if (bravoData.value?.grid) {
+          const size = bravoData.value.grid.length;
+          animatedGrid.value = Array.from({ length: size }, () =>
+            Array.from({ length: size }, () => "unknown" as CellState),
+          );
+          animationIndex.value = 0;
+        }
+      }, 2000);
+    }
+  }, 150);
+}
+
+function stopSolutionAnimation() {
+  if (animationInterval) {
+    window.clearInterval(animationInterval);
+    animationInterval = null;
+  }
+}
 
 onMounted(async () => {
   if (!import.meta.client) return;
@@ -59,7 +116,6 @@ onMounted(async () => {
     const e = ev as PromiseRejectionEvent;
     console.error("[BRAVO] unhandled rejection:", e.reason);
   };
-  // Expose handlers on window for cleanup in onBeforeUnmount
   window.__bravo_onError = __bravo_onError;
   window.__bravo_onRejection = __bravo_onRejection;
   window.addEventListener("error", __bravo_onError);
@@ -71,17 +127,16 @@ onMounted(async () => {
     try {
       bravoData.value = JSON.parse(raw) as BravoData;
       loading.value = false;
+      startSolutionAnimation();
       return;
     } catch (e) {
       console.error("[BRAVO] sessionStorage parse error:", e);
-      // Si erreur de parsing, continuer vers la base de données
     }
   }
 
   // 2. Si pas dans sessionStorage, récupérer depuis la base de données
   const { $supabase } = useNuxtApp();
   try {
-    // Récupérer le play terminé pour ce niveau
     const { data: play } = await $supabase
       .from("plays")
       .select("time_spent_seconds, moves, completed_at")
@@ -91,7 +146,6 @@ onMounted(async () => {
       .limit(1)
       .maybeSingle();
 
-    // Récupérer les données du niveau
     const { data: levelData } = await $supabase
       .from("levels")
       .select("data, day")
@@ -99,10 +153,9 @@ onMounted(async () => {
       .maybeSingle();
 
     if (play && levelData) {
-      // Reconstruire bravoData à partir des données de la BDD
       const levelContent = levelData.data as DanmenLevel;
       bravoData.value = {
-        grid: [], // La grille finale n'est pas sauvegardée, on peut la laisser vide ou la reconstruire
+        grid: levelContent.solution ?? [],
         timeSpentSeconds: play.time_spent_seconds ?? 0,
         moves: play.moves ?? 0,
         day: levelData.day,
@@ -110,32 +163,22 @@ onMounted(async () => {
         rowCounts: levelContent.rowCounts ?? [],
         colCounts: levelContent.colCounts ?? [],
       };
-    } else {
-      console.log(
-        "[BRAVO] Missing data - play:",
-        !!play,
-        "levelData:",
-        !!levelData,
-      );
+      startSolutionAnimation();
     }
   } catch (error) {
-    console.error(
-      "[BRAVO] Erreur lors du chargement des données bravo:",
-      error,
-    );
+    console.error("[BRAVO] Erreur lors du chargement:", error);
   } finally {
     loading.value = false;
   }
 });
 
 onBeforeUnmount(() => {
-  // Retirer les écouteurs d'erreurs ajoutés au montage (si présents)
+  stopSolutionAnimation();
   try {
     const h1 = window.__bravo_onError as EventListener | undefined;
     const h2 = window.__bravo_onRejection as EventListener | undefined;
     if (h1) window.removeEventListener("error", h1);
     if (h2) window.removeEventListener("unhandledrejection", h2);
-    // cleanup
     delete window.__bravo_onError;
     delete window.__bravo_onRejection;
   } catch {
@@ -150,18 +193,14 @@ const formattedTime = computed(() => {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 });
 
-const difficulty = computed(() => bravoData.value?.difficulty ?? 1);
 const dayDisplay = computed(() => bravoData.value?.day ?? dayParam.value);
-const gridSize = computed(() => bravoData.value?.grid.length ?? 0);
+const gridSize = computed(() => bravoData.value?.grid?.length ?? 0);
 
-function goHome() {
-  router.push("/");
+function goProgress() {
+  router.push("/progress");
 }
 function goProfile() {
   router.push("/profile");
-}
-function toggleSolution() {
-  showSolution.value = !showSolution.value;
 }
 </script>
 
@@ -180,149 +219,118 @@ function toggleSolution() {
       v-else-if="!bravoData"
       class="flex flex-col items-center justify-center w-full text-center px-4"
     >
-      <div class="text-5xl mb-4">🤔</div>
-      <h1 class="font-lily text-2xl text-dark-500 mb-4">
+      <h1 class="text-2xl font-bold text-dark-500 mb-4">
         Aucune donnée disponible
       </h1>
-      <UiButton variant="primary" size="md" @click="goHome"
-        >Retour à l'accueil</UiButton
+      <UiButton variant="primary" size="md" @click="goProgress"
+        >Retour à la progression</UiButton
       >
     </div>
 
     <!-- Contenu normal -->
     <div
       v-else
-      class="flex flex-col justify-center w-full max-w-120 min-h-dvh px-4 py-8 bg-light-500"
+      class="flex flex-col justify-center w-full max-w-md min-h-dvh px-4 py-8 bg-light-500"
     >
+      <!-- Header -->
       <div class="text-center mb-6">
-        <div class="text-5xl mb-4">🎉</div>
-        <h1 class="font-lily text-3xl text-dark-500 mb-2">Bravo !</h1>
+        <h1 class="text-3xl font-bold text-dark-500 mb-2">Bravo !</h1>
         <p class="text-dark-500/70">
           Tu as terminé le puzzle {{ gameDisplayName }} du jour
         </p>
+        <p class="text-dark-500/50 text-sm mt-1">{{ dayDisplay }}</p>
       </div>
 
       <!-- Stats -->
-      <div class="flex justify-center gap-6 mb-8">
+      <div class="flex justify-center gap-8 mb-8">
         <div class="text-center">
-          <div class="text-2xl font-bold text-dark-500">
+          <div class="text-3xl font-bold text-indigo-500">
             {{ formattedTime }}
           </div>
           <div class="text-sm text-dark-500/60">Temps</div>
         </div>
         <div class="text-center">
-          <div class="text-2xl font-bold text-dark-500">
+          <div class="text-3xl font-bold text-indigo-500">
             {{ bravoData?.moves ?? 0 }}
           </div>
           <div class="text-sm text-dark-500/60">Coups</div>
         </div>
-        <div class="text-center">
-          <div class="flex gap-0.5 text-2xl">
-            <span
-              v-for="i in 3"
-              :key="i"
-              :class="i <= difficulty ? 'text-dark-500' : 'text-dark-500/30'"
-              >★</span
-            >
-          </div>
-          <div class="text-sm text-dark-500/60">Difficulté</div>
-        </div>
       </div>
 
-      <!-- Grille figée -->
-      <div v-if="bravoData && gridSize > 0" class="mx-auto mb-8 max-w-xs">
-        <div class="relative">
-          <!-- Col counts en haut -->
+      <!-- Solution animée en encadré -->
+      <div v-if="gridSize > 0" class="mb-8">
+        <div class="bg-dark-500/5 border border-dark-500/10 rounded-2xl p-4">
+          <p class="text-center text-sm text-dark-500/60 mb-3">Solution</p>
           <div
-            v-if="showSolution && bravoData.colCounts"
-            class="flex justify-center mb-2 gap-px"
+            class="bg-dark-500 rounded-xl p-0.5 mx-auto"
+            :style="{ width: gridSize >= 5 ? '200px' : '160px' }"
           >
             <div
-              v-for="(count, i) in bravoData.colCounts"
-              :key="'col-' + i"
-              class="flex-1 text-center text-sm font-semibold text-dark-500"
-              :style="{ aspectRatio: '1' }"
-            >
-              {{ count }}
-            </div>
-          </div>
-
-          <div class="flex gap-2">
-            <!-- Row counts à gauche -->
-            <div
-              v-if="showSolution && bravoData.rowCounts"
-              class="flex flex-col justify-center gap-px"
-            >
-              <div
-                v-for="(count, i) in bravoData.rowCounts"
-                :key="'row-' + i"
-                class="flex items-center justify-center text-sm font-semibold text-dark-500"
-                :style="{ aspectRatio: '1', flex: '1' }"
-              >
-                {{ count }}
-              </div>
-            </div>
-
-            <!-- Grille -->
-            <div
-              class="bg-dark-500 rounded-xl p-0 overflow-hidden grid flex-1"
+              class="grid"
               :style="{
                 gridTemplateColumns: `repeat(${gridSize}, 1fr)`,
                 gridTemplateRows: `repeat(${gridSize}, 1fr)`,
+                gap: '2px',
               }"
             >
-              <div
-                v-for="(row, r) in bravoData.grid"
-                :key="'row-' + r"
-                class="contents"
-              >
+              <template v-for="r in gridSize" :key="'row-' + r">
                 <div
-                  v-for="(cell, c) in row"
+                  v-for="c in gridSize"
                   :key="'cell-' + r + '-' + c"
-                  class="aspect-square flex items-center justify-center border border-dark-500"
-                  :class="
-                    cell === 'filled' ? 'bg-indigo-500' : 'bg-lavender-500'
-                  "
+                  class="aspect-square flex items-center justify-center transition-all duration-200"
+                  :class="[
+                    animatedGrid[r - 1]?.[c - 1] === 'filled'
+                      ? 'bg-indigo-500'
+                      : animatedGrid[r - 1]?.[c - 1] === 'empty'
+                        ? 'bg-lavender-500'
+                        : 'bg-lavender-500/50',
+                    r === 1 && c === 1 ? 'rounded-tl-lg' : '',
+                    r === 1 && c === gridSize ? 'rounded-tr-lg' : '',
+                    r === gridSize && c === 1 ? 'rounded-bl-lg' : '',
+                    r === gridSize && c === gridSize ? 'rounded-br-lg' : '',
+                  ]"
                 >
                   <span
-                    v-if="cell === 'filled'"
-                    class="w-2/5 h-2/5 rounded-full bg-light-500"
+                    v-if="animatedGrid[r - 1]?.[c - 1] === 'filled'"
+                    class="w-2/5 h-2/5 rounded-full bg-light-500 animate-in zoom-in duration-200"
                   />
                   <svg
-                    v-else-if="cell === 'empty'"
+                    v-else-if="animatedGrid[r - 1]?.[c - 1] === 'empty'"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
                     stroke-width="1.5"
                     stroke-linecap="round"
                     stroke-linejoin="round"
-                    class="w-3/5 h-3/5 text-dark-500"
+                    class="w-3/5 h-3/5 text-dark-500 animate-in zoom-in duration-200"
                   >
                     <line x1="5" y1="5" x2="19" y2="19" />
                     <line x1="19" y1="5" x2="5" y2="19" />
                   </svg>
                 </div>
-              </div>
+              </template>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Date du daily -->
-      <div class="text-center text-dark-500/60 text-sm mb-8">
-        Daily du {{ dayDisplay }}
-      </div>
-
       <!-- Boutons -->
       <div class="flex flex-col gap-3 items-center">
-        <UiButton variant="secondary" size="lg" @click="toggleSolution">
-          {{ showSolution ? "Masquer" : "Voir" }} la solution
+        <UiButton
+          variant="primary"
+          size="lg"
+          class="w-full max-w-xs"
+          @click="goProgress"
+        >
+          Voir ma progression
         </UiButton>
-        <UiButton variant="primary" size="lg" @click="goProfile">
-          Voir ma plante / profil
-        </UiButton>
-        <UiButton variant="secondary" size="lg" @click="goHome">
-          Retour à l'accueil
+        <UiButton
+          variant="secondary"
+          size="lg"
+          class="w-full max-w-xs"
+          @click="goProfile"
+        >
+          Mon profil
         </UiButton>
       </div>
     </div>

@@ -14,6 +14,10 @@ const size = computed(() => props.level.size);
 const isDragging = ref(false);
 const dragState = ref<CellState | null>(null);
 
+/** --- Mode de sélection (circle/cross) --- */
+type SelectionMode = "toggle" | "circle" | "cross";
+const selectedMode = ref<SelectionMode>("circle");
+
 /** --- Historique pour annuler --- */
 interface HistoryEntry {
   r: number;
@@ -201,6 +205,14 @@ function cornerClass(r: number, c: number, size: number) {
 
 /** --- Interaction --- */
 function nextState(current: CellState): CellState {
+  if (selectedMode.value === "circle") {
+    // Mode cercle: toggle entre unknown et filled
+    return current === "filled" ? "unknown" : "filled";
+  } else if (selectedMode.value === "cross") {
+    // Mode croix: toggle entre unknown et empty
+    return current === "empty" ? "unknown" : "empty";
+  }
+  // Mode toggle (défaut): cycle normal
   if (current === "unknown") return "filled";
   if (current === "filled") return "empty";
   return "unknown";
@@ -395,18 +407,35 @@ function countLineStats(cells: CellState[]): { count: number; groups: number } {
 }
 
 function checkLevelComplete() {
+  console.log(
+    "[DanmenBoard] checkLevelComplete called, levelComplete=",
+    levelComplete.value,
+  );
   if (levelComplete.value) return;
   const n = size.value;
+  console.log("[DanmenBoard] Checking grid size:", n);
   // Vérifier toutes les lignes
   for (let r = 0; r < n; r++) {
     const row = grid.value[r] ?? [];
     const rule = props.level.rules.rows[r];
-    if (!rule) return;
+    if (!rule) {
+      console.log("[DanmenBoard] No rule for row", r);
+      return;
+    }
     const stats = countLineStats(row);
     if (stats.count !== rule.count || stats.groups !== rule.groups) {
+      console.log(
+        "[DanmenBoard] Row",
+        r,
+        "failed: stats=",
+        stats,
+        "rule=",
+        rule,
+      );
       return;
     }
   }
+  console.log("[DanmenBoard] All rows passed!");
   // Vérifier toutes les colonnes
   for (let c = 0; c < n; c++) {
     const col: CellState[] = [];
@@ -414,12 +443,24 @@ function checkLevelComplete() {
       col.push(grid.value[r]?.[c] ?? "unknown");
     }
     const rule = props.level.rules.cols[c];
-    if (!rule) return;
+    if (!rule) {
+      console.log("[DanmenBoard] No rule for col", c);
+      return;
+    }
     const stats = countLineStats(col);
     if (stats.count !== rule.count || stats.groups !== rule.groups) {
+      console.log(
+        "[DanmenBoard] Col",
+        c,
+        "failed: stats=",
+        stats,
+        "rule=",
+        rule,
+      );
       return;
     }
   }
+  console.log("[DanmenBoard] All cols passed! Level complete!");
   levelComplete.value = true;
   emit("complete");
 }
@@ -428,12 +469,18 @@ export type DanmenBoardExposed = {
   reset: () => void;
   getMoves: () => number;
   getGrid: () => CellState[][];
+  setSelectedMode: (mode: SelectionMode) => void;
+  getSelectedMode: () => SelectionMode;
 };
 
 defineExpose<DanmenBoardExposed>({
   reset,
   getMoves: () => moves.value,
   getGrid: () => grid.value.map((r) => r.slice()),
+  setSelectedMode: (mode: SelectionMode) => {
+    selectedMode.value = mode;
+  },
+  getSelectedMode: () => selectedMode.value,
 });
 </script>
 
@@ -558,10 +605,15 @@ defineExpose<DanmenBoardExposed>({
         </template>
       </div>
     </div>
-    <!-- Boutons Annuler, Indice (cooldown) et Reset -->
-    <div class="flex justify-between gap-2">
-      <UiButton variant="secondary" size="md" @click="reset">Reset</UiButton>
+    <!-- Boutons: Effacer, Annuler -->
+    <div class="flex justify-center gap-4">
+      <UiButton variant="secondary" size="md" @click="reset">Effacer</UiButton>
 
+      <UiButton variant="secondary" size="md" :disabled="!canUndo" @click="undo"
+        >Annuler</UiButton
+      >
+
+      <!-- Bouton Indice (commenté pour l'instant)
       <UiButton
         variant="secondary"
         size="md"
@@ -571,10 +623,7 @@ defineExpose<DanmenBoardExposed>({
         <template v-if="hintCooldownLeft === 0">Indice</template>
         <template v-else>Indice ({{ hintCooldownLeft }}s)</template>
       </UiButton>
-
-      <UiButton variant="primary" size="md" :disabled="!canUndo" @click="undo"
-        >Annuler</UiButton
-      >
+      -->
     </div>
   </div>
 </template>
