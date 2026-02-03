@@ -126,7 +126,12 @@ onMounted(async () => {
   await auth.initAuth();
 
   console.log("[BRAVO] levelId:", levelId.value, "dayParam:", dayParam.value);
-  console.log("[BRAVO] isLoggedIn:", auth.isLoggedIn.value, "userId:", auth.user.value?.id);
+  console.log(
+    "[BRAVO] isLoggedIn:",
+    auth.isLoggedIn.value,
+    "userId:",
+    auth.user.value?.id,
+  );
 
   // 1. Essayer de récupérer depuis sessionStorage (cas normal après victoire)
   const raw = sessionStorage.getItem(`seed:bravo:${levelId.value}`);
@@ -144,7 +149,7 @@ onMounted(async () => {
 
   // 2. Si pas dans sessionStorage, récupérer depuis la base de données
   const { $supabase } = useNuxtApp();
-  
+
   // Vérifier que levelId est présent
   if (!levelId.value) {
     console.error("[BRAVO] No levelId in query params");
