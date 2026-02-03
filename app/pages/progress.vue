@@ -261,18 +261,19 @@ onMounted(async () => {
 
     <!-- Header flottant (back + streak + bouton jouer) -->
     <header
-      class="fixed top-0 left-0 right-0 p-4 z-50 flex items-center justify-between"
+      class="fixed top-0 left-0 right-0 p-2 sm:p-4 z-50 flex items-center justify-between gap-2 sm:gap-4"
     >
       <NuxtLink
         to="/"
-        class="back-btn w-12 h-12 rounded-lg flex items-center justify-center text-white bg-light-500/30 backdrop-blur-sm transition-all hover:bg-light-500/50"
+        class="back-btn w-9 h-9 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center text-white bg-light-500/30 backdrop-blur-sm transition-all hover:bg-light-500/50"
         aria-label="Retour"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          width="24"
-          height="24"
+          width="20"
+          height="20"
           viewBox="0 0 24 24"
+          class="sm:w-6 sm:h-6"
           fill="none"
           stroke="currentColor"
           stroke-width="2"
@@ -288,23 +289,26 @@ onMounted(async () => {
         class="flex flex-col items-center justify-center"
         aria-hidden="false"
       >
-        <div class="text-2xl font-extrabold text-light-500 drop-shadow-sm">
+        <div
+          class="text-lg sm:text-2xl font-extrabold text-light-500 drop-shadow-sm"
+        >
           {{ streak }}
         </div>
-        <div class="text-xs text-light-500/60 -mt-1">jours</div>
+        <div class="text-xs text-light-500/60 -mt-0.5 sm:-mt-1">jours</div>
       </div>
 
       <NuxtLink
         v-if="!loading"
         to="/games/danmen"
-        class="w-12 h-12 flex items-center justify-center bg-light-500/30 text-white rounded-lg transition-all hover:bg-light-500/50"
+        class="w-9 h-9 sm:w-12 sm:h-12 flex items-center justify-center bg-light-500/30 text-white rounded-lg transition-all hover:bg-light-500/50"
         aria-label="Jouer"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          width="20"
-          height="20"
+          width="18"
+          height="18"
           viewBox="0 0 24 24"
+          class="sm:w-5 sm:h-5"
           fill="none"
           stroke="currentColor"
           stroke-width="2"
@@ -314,7 +318,7 @@ onMounted(async () => {
           <path d="M5 3v18l15-9L5 3z" />
         </svg>
       </NuxtLink>
-      <div v-else class="w-12 h-12" />
+      <div v-else class="w-9 h-9 sm:w-12 sm:h-12" />
     </header>
 
     <!-- Loader -->
@@ -1092,44 +1096,79 @@ onMounted(async () => {
 
 .active-plant .plant-svg-item {
   width: 100%;
-  max-width: 600px;
+  max-width: 400px;
   height: auto;
-  min-height: 65vh;
+  min-height: 50vh;
   max-height: calc(100vh - 120px);
   filter: drop-shadow(0 10px 40px rgba(129, 212, 250, 0.25));
+}
+
+@media (min-width: 640px) {
+  .active-plant .plant-svg-item {
+    max-width: 600px;
+    min-height: 65vh;
+  }
 }
 
 /* Plantes inactives - moyennes sur les côtés */
 .inactive-plant {
   z-index: 5;
-  width: 220px;
+  width: 100px;
   opacity: 0.6;
   align-self: flex-end;
-  transform: translateY(-60px);
+  transform: translateY(-30px);
 }
 
 .inactive-plant .plant-svg-item {
-  width: 200px;
-  max-width: 200px;
+  width: 90px;
+  max-width: 90px;
   height: auto;
-  min-height: 50vh;
-  max-height: calc(70vh - 60px);
+  min-height: 35vh;
+  max-height: calc(60vh - 30px);
   filter: grayscale(30%) drop-shadow(0 5px 20px rgba(129, 212, 250, 0.1));
 }
 
 .inactive-plant:hover {
   opacity: 0.8;
-  transform: scale(1.1) translateY(-60px);
+  transform: scale(1.1) translateY(-30px);
+}
+
+@media (min-width: 640px) {
+  .inactive-plant {
+    width: 220px;
+    transform: translateY(-60px);
+  }
+
+  .inactive-plant .plant-svg-item {
+    width: 200px;
+    max-width: 200px;
+    min-height: 50vh;
+    max-height: calc(70vh - 60px);
+  }
+
+  .inactive-plant:hover {
+    transform: scale(1.1) translateY(-60px);
+  }
 }
 
 /* Plantes à gauche */
 .left-plant {
-  margin-right: -40px;
+  margin-right: -20px;
 }
 
 /* Plantes à droite */
 .right-plant {
-  margin-left: -40px;
+  margin-left: -20px;
+}
+
+@media (min-width: 640px) {
+  .left-plant {
+    margin-right: -40px;
+  }
+
+  .right-plant {
+    margin-left: -40px;
+  }
 }
 
 /* Flèches de navigation */
@@ -1138,13 +1177,14 @@ onMounted(async () => {
   top: 50%;
   transform: translateY(-50%);
   z-index: 30;
-  padding: 12px;
+  padding: 8px;
   border-radius: 50%;
   background: rgba(79, 195, 247, 0.3);
   color: #4fc3f7;
   transition: all 0.2s ease;
   border: none;
   cursor: pointer;
+  font-size: 18px;
 }
 
 .nav-arrow:hover {
@@ -1152,12 +1192,29 @@ onMounted(async () => {
   color: #29b6f6;
 }
 
+@media (min-width: 640px) {
+  .nav-arrow {
+    padding: 12px;
+    font-size: 24px;
+  }
+}
+
 .nav-arrow-left {
-  left: 12px;
+  left: 8px;
 }
 
 .nav-arrow-right {
-  right: 12px;
+  right: 8px;
+}
+
+@media (min-width: 640px) {
+  .nav-arrow-left {
+    left: 12px;
+  }
+
+  .nav-arrow-right {
+    right: 12px;
+  }
 }
 
 /* Indicateurs (dots) */
