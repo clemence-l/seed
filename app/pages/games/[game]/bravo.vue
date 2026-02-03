@@ -150,20 +150,26 @@ onMounted(async () => {
   // 2. Si pas dans sessionStorage, récupérer depuis la base de données
   const { $supabase } = useNuxtApp();
 
-  // Vérifier que levelId est présent
-  if (!levelId.value) {
-    console.error("[BRAVO] No levelId in query params");
+  // Vérifier que dayParam est présent (on utilise game_id + day pour trouver le niveau)
+  if (!dayParam.value) {
+    console.error("[BRAVO] No day in query params");
     loading.value = false;
     return;
   }
 
   try {
-    // D'abord récupérer les données du niveau (toujours disponible)
-    console.log("[BRAVO] Fetching level data for id:", levelId.value);
+    // Récupérer les données du niveau par game_id + day (pas par l'id interne)
+    console.log(
+      "[BRAVO] Fetching level data for game:",
+      gameName.value,
+      "day:",
+      dayParam.value,
+    );
     const { data: levelData, error: levelError } = await $supabase
       .from("levels")
       .select("data, day")
-      .eq("id", levelId.value)
+      .eq("game_id", gameName.value)
+      .eq("day", dayParam.value)
       .maybeSingle();
 
     console.log("[BRAVO] Level data:", levelData, "error:", levelError);
