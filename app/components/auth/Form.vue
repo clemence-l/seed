@@ -19,6 +19,16 @@ const successMsg = ref<string | null>(null);
 
 const isLogin = computed(() => props.mode === "login");
 
+async function onProvider(provider: string) {
+  errorMsg.value = null;
+  successMsg.value = null;
+
+  const result = await auth.signInWithProvider(provider);
+  if (!result.success) {
+    errorMsg.value = result.error ?? "Erreur lors de la connexion";
+  }
+}
+
 async function handleSubmit(): Promise<void> {
   errorMsg.value = null;
   successMsg.value = null;
@@ -50,7 +60,7 @@ async function handleSubmit(): Promise<void> {
 </script>
 
 <template>
-  <div class="flex flex-col gap-24">
+  <div class="flex flex-col gap-16">
     <!-- Onglets -->
     <nav class="flex border-b border-dark-500/10 shrink-0">
       <NuxtLink
@@ -140,6 +150,27 @@ async function handleSubmit(): Promise<void> {
             }}
           </UiButton>
         </form>
+
+        <!-- OAuth providers -->
+        <div class="mt-6">
+          <p class="text-center text-sm text-dark-500/60 mb-4">
+            Ou se connecter avec
+          </p>
+          <div>
+            <UiButton
+              variant="outline"
+              size="md"
+              class="w-full flex items-center justify-center gap-3"
+              @click="onProvider('google')"
+              :disabled="auth.loading.value"
+            >
+              <UiIcon src="/img/google.png" class="w-4 h-4 object-contain" />
+              <span>{{
+                isLogin ? "Se connecter avec Google" : "S'inscrire avec Google"
+              }}</span>
+            </UiButton>
+          </div>
+        </div>
       </div>
     </div>
   </div>

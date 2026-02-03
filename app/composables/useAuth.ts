@@ -297,6 +297,42 @@ export function useAuth() {
     }
   }
 
+  /** Connexion via provider OAuth (Google, linkedin, apple, ...)
+   * Uses Supabase auth.signInWithOAuth under the hood.
+   * Redirect URL will default to window.location.origin + '/auth/callback' when available.
+   */
+  async function signInWithProvider(
+    provider: string,
+  ): Promise<{ success: boolean; error?: string }> {
+    const supabase = getSupabase();
+    state.loading = true;
+    state.error = null;
+
+    try {
+      const redirectTo =
+        typeof window !== "undefined"
+          ? `${window.location.origin}/auth/callback`
+          : undefined;
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: provider as any,
+        options: redirectTo ? { redirectTo } : undefined,
+      });
+
+      if (error) throw error;
+
+      // When redirect flow is used, Supabase will redirect the browser and
+      // there is no immediate session here. Consider this a success.
+      return { success: true };
+    } catch (e: unknown) {
+      const message = getErrorMessage(e, "Erreur lors de la connexion OAuth");
+      state.error = message;
+      return { success: false, error: message };
+    } finally {
+      state.loading = false;
+    }
+  }
+
   /** Inscription (on stocke le pseudo dans user_metadata.display_name) */
   async function signUp(
     email: string,
@@ -397,6 +433,7 @@ export function useAuth() {
     signIn,
     signUp,
     signOut,
+    signInWithProvider,
     initAuth,
     fetchSession,
     fetchProfile,

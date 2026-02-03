@@ -1,7 +1,11 @@
 <script setup lang="ts">
+
+// import { computed } from "vue";
 /**
  * Composant d'icônes SVG réutilisable
- * Usage: <UiIcon name="edit" class="w-4 h-4" />
+ * Usage:
+ * - SVG inline: <UiIcon name="edit" class="w-4 h-4" />
+ * - Image file: <UiIcon src="/icons/custom.png" alt="..." class="w-6 h-6" />
  */
 
 type IconName =
@@ -18,9 +22,13 @@ type IconName =
   | "info"
   | "alert";
 
-defineProps<{
-  name: IconName;
+const props = defineProps<{
+  name?: IconName;
+  /** When provided, render a NuxtImg instead of an inline SVG */
+  src?: string;
+  alt?: string;
 }>();
+
 
 const icons: Record<IconName, string> = {
   edit: `<path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke-linecap="round" stroke-linejoin="round"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke-linecap="round" stroke-linejoin="round"/>`,
@@ -39,7 +47,15 @@ const icons: Record<IconName, string> = {
 </script>
 
 <template>
+  <NuxtImg
+    v-if="props.src"
+    :src="props.src"
+    :alt="props.alt ?? props.name ?? ''"
+    :sizes="undefined"
+  />
+
   <svg
+    v-else
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -47,6 +63,6 @@ const icons: Record<IconName, string> = {
     aria-hidden="true"
   >
     <!-- eslint-disable-next-line vue/no-v-html -->
-    <g v-html="icons[name]" />
+    <g v-html="icons[props.name]" />
   </svg>
 </template>
