@@ -265,7 +265,7 @@ onMounted(async () => {
     >
       <NuxtLink
         to="/"
-        class="back-btn w-12 h-12 rounded-lg flex items-center justify-center text-dark-500/60 bg-dark-500/5 backdrop-blur-sm transition-all hover:bg-dark-500/15 hover:text-dark-500"
+        class="back-btn w-12 h-12 rounded-lg flex items-center justify-center text-white bg-light-500/30 backdrop-blur-sm transition-all hover:bg-light-500/50"
         aria-label="Retour"
       >
         <svg
@@ -288,16 +288,16 @@ onMounted(async () => {
         class="flex flex-col items-center justify-center"
         aria-hidden="false"
       >
-        <div class="text-2xl font-extrabold text-dark-500 drop-shadow-sm">
+        <div class="text-2xl font-extrabold text-light-500 drop-shadow-sm">
           {{ streak }}
         </div>
-        <div class="text-xs text-dark-500/60 -mt-1">jours</div>
+        <div class="text-xs text-light-500/60 -mt-1">jours</div>
       </div>
 
       <NuxtLink
         v-if="!loading"
         to="/games/danmen"
-        class="w-12 h-12 flex items-center justify-center bg-green-500/20 text-green-700 rounded-lg transition-all hover:bg-green-500/30"
+        class="w-12 h-12 flex items-center justify-center bg-light-500/30 text-white rounded-lg transition-all hover:bg-light-500/50"
         aria-label="Jouer"
       >
         <svg
@@ -671,7 +671,7 @@ onMounted(async () => {
       v-if="!loading"
       class="info-overlay fixed bottom-0 left-0 right-0 px-4 pt-6 pb-8 text-center z-20"
     >
-      <p class="text-base text-dark-500/70 mb-5">{{ encouragement }}</p>
+      <p class="text-base text-light-500/70 mb-5">{{ encouragement }}</p>
     </div>
 
     <!-- Popup stats feuille -->
@@ -713,10 +713,10 @@ onMounted(async () => {
 
             <div class="text-center">
               <div
-                class="w-16 h-16 mx-auto mb-4 rounded-full bg-green-100 flex items-center justify-center"
+                class="w-16 h-16 mx-auto mb-4 rounded-full bg-purple-500/20 flex items-center justify-center"
               >
                 <svg
-                  class="w-8 h-8 text-green-600"
+                  class="w-8 h-8 text-purple-500"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -738,14 +738,14 @@ onMounted(async () => {
               </p>
 
               <div class="grid grid-cols-2 gap-4">
-                <div class="bg-green-50 rounded-xl p-4">
-                  <div class="text-2xl font-bold text-green-600">
+                <div class="bg-purple-500/15 rounded-xl p-4">
+                  <div class="text-2xl font-bold text-purple-500">
                     {{ leafStats?.moves ?? "--" }}
                   </div>
                   <div class="text-xs text-dark-500/60 mt-1">Coups</div>
                 </div>
-                <div class="bg-amber-50 rounded-xl p-4">
-                  <div class="text-2xl font-bold text-amber-600">
+                <div class="bg-indigo-500/15 rounded-xl p-4">
+                  <div class="text-2xl font-bold text-indigo-500">
                     {{ formatTime(leafStats?.timeSpentSeconds ?? null) }}
                   </div>
                   <div class="text-xs text-dark-500/60 mt-1">Temps</div>
@@ -760,40 +760,23 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-/* Background gradient - doux et magique */
+/* Background gradient - Thème hivernal sombre avec couleurs du projet */
 .progress-page {
   background: linear-gradient(
     180deg,
-    #e8f5e9 0%,
-    #f1f8e9 15%,
-    #fffde7 35%,
-    #fff8e1 55%,
-    #e8f5e9 75%,
-    #c8e6c9 100%
+    #131313 0%,
+    #1f1f1f 30%,
+    #1a1a1a 60%,
+    #131313 100%
   );
 }
 
-/* Décor magique - particules lumineuses subtiles */
+/* Décor hivernal - lueur glaçée subtile sur fond sombre */
 .sky-subtle::before {
   content: "";
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(
-      circle at 20% 30%,
-      rgba(167, 219, 167, 0.3) 0%,
-      transparent 25%
-    ),
-    radial-gradient(
-      circle at 80% 20%,
-      rgba(255, 236, 179, 0.4) 0%,
-      transparent 20%
-    ),
-    radial-gradient(
-      circle at 60% 70%,
-      rgba(200, 230, 201, 0.3) 0%,
-      transparent 30%
-    );
+  background: transparent;
   pointer-events: none;
   animation: shimmer 8s ease-in-out infinite;
 }
@@ -1038,8 +1021,8 @@ onMounted(async () => {
 .info-overlay {
   background: linear-gradient(
     to top,
-    rgba(255, 255, 255, 0.95) 0%,
-    rgba(255, 255, 255, 0.7) 50%,
+    rgba(19, 19, 19, 0.95) 0%,
+    rgba(31, 31, 31, 0.7) 50%,
     transparent 100%
   );
   backdrop-filter: blur(10px);
@@ -1081,11 +1064,7 @@ onMounted(async () => {
   content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(
-    ellipse at center bottom,
-    rgba(129, 199, 132, 0.2) 0%,
-    transparent 60%
-  );
+  background: transparent;
   pointer-events: none;
 }
 
@@ -1117,7 +1096,7 @@ onMounted(async () => {
   height: auto;
   min-height: 65vh;
   max-height: calc(100vh - 120px);
-  filter: drop-shadow(0 10px 40px rgba(129, 199, 132, 0.3));
+  filter: drop-shadow(0 10px 40px rgba(129, 212, 250, 0.25));
 }
 
 /* Plantes inactives - moyennes sur les côtés */
@@ -1135,7 +1114,7 @@ onMounted(async () => {
   height: auto;
   min-height: 50vh;
   max-height: calc(70vh - 60px);
-  filter: grayscale(30%) drop-shadow(0 5px 20px rgba(129, 199, 132, 0.15));
+  filter: grayscale(30%) drop-shadow(0 5px 20px rgba(129, 212, 250, 0.1));
 }
 
 .inactive-plant:hover {
@@ -1161,16 +1140,16 @@ onMounted(async () => {
   z-index: 30;
   padding: 12px;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.08);
-  color: rgba(0, 0, 0, 0.5);
+  background: rgba(79, 195, 247, 0.3);
+  color: #4fc3f7;
   transition: all 0.2s ease;
   border: none;
   cursor: pointer;
 }
 
 .nav-arrow:hover {
-  background: rgba(0, 0, 0, 0.15);
-  color: rgba(0, 0, 0, 0.7);
+  background: rgba(79, 195, 247, 0.5);
+  color: #29b6f6;
 }
 
 .nav-arrow-left {
@@ -1196,22 +1175,22 @@ onMounted(async () => {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(254, 254, 254, 0.3);
   border: none;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .dot:hover {
-  background: rgba(0, 0, 0, 0.35);
+  background: rgba(254, 254, 254, 0.5);
 }
 
 .dot-active {
-  background: #6ec977;
+  background: #4fc3f7;
   transform: scale(1.2);
 }
 
 .dot-active:hover {
-  background: #5fa769;
+  background: #29b6f6;
 }
 </style>

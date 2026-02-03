@@ -1,9 +1,17 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from "vue";
 
-type LeafShape = "maple" | "oak" | "simple" | "round" | "long";
+type ElementShape =
+  | "snowflake"
+  | "snowflake2"
+  | "leaf-frost"
+  | "leaf-simple"
+  | "leaf-pointy"
+  | "leaf-round"
+  | "ice-crystal"
+  | "simple-snow";
 
-interface Leaf {
+interface FallingElement {
   id: number;
   x: number;
   y: number;
@@ -16,134 +24,188 @@ interface Leaf {
   color: string;
   swayPhase: number;
   swaySpeed: number;
-  shape: LeafShape;
+  shape: ElementShape;
 }
 
 const canvasRef = ref<HTMLCanvasElement | null>(null);
-const leaves = ref<Leaf[]>([]);
+const elements = ref<FallingElement[]>([]);
 const animationId = ref<number | null>(null);
 
-let leafIdCounter = 0;
+let elementIdCounter = 0;
 
-// Couleurs naturelles automne
+// Couleurs hivernales
 const COLORS = [
-  // Verts
-  "#6ec977",
-  "#8ed591",
-  "#5fa769",
-  "#a8e6ae",
-  "#81c784",
-  "#66bb6a",
-  // Jaunes
-  "#ffd54f",
-  "#ffcc80",
-  "#ffe082",
-  "#fff176",
-  "#dce775",
-  // Oranges
-  "#ffb74d",
-  "#ff8a65",
-  "#ffa726",
-  "#fb8c00",
-  // Rouges doux
-  "#e57373",
-  "#ef5350",
-  "#ff7043",
-  "#d4574a",
-  // Marrons
-  "#8d6e63",
-  "#a1887f",
-  "#795548",
-  "#6d4c41",
-  "#bcaaa4",
+  // Blancs et gris clairs (flocons)
+  "#ffffff",
+  "#f5f5f5",
+  "#e8e8e8",
+  "#d4e5f7",
+  "#e3f2fd",
+  // Bleus glacés
+  "#b3e5fc",
+  "#81d4fa",
+  "#4fc3f7",
+  "#a5d6f7",
+  "#c5e8f7",
+  // Bleu-gris givrés
+  "#b0bec5",
+  "#90a4ae",
+  "#cfd8dc",
+  // Très peu de vert hivernal (conifères)
+  "#2e7d32",
+  "#388e3c",
 ];
 
-const SHAPES: LeafShape[] = ["maple", "oak", "simple", "round", "long"];
-
-function createLeaf(x?: number, y?: number, burst = false): Leaf {
+function createFallingElement(
+  x?: number,
+  y?: number,
+  burst = false,
+): FallingElement {
   const canvas = canvasRef.value;
-  if (!canvas) return {} as Leaf;
+  if (!canvas) return {} as FallingElement;
+
+  // Beaucoup moins de flocons que de feuilles
+  const isSnow = Math.random() < 0.2;
+  const snowShapes: ElementShape[] = [
+    "snowflake",
+    "snowflake2",
+    "simple-snow",
+    "ice-crystal",
+  ];
+  const leafShapes: ElementShape[] = [
+    "leaf-frost",
+    "leaf-simple",
+    "leaf-pointy",
+    "leaf-round",
+  ];
 
   return {
-    id: leafIdCounter++,
+    id: elementIdCounter++,
     x: x ?? Math.random() * canvas.width,
     y: y ?? (burst ? 0 : -50 - Math.random() * 150),
-    size: 10 + Math.random() * 20,
+    size: isSnow ? 6 + Math.random() * 14 : 12 + Math.random() * 18,
     rotation: Math.random() * 360,
-    rotationSpeed: (Math.random() - 0.5) * 3,
-    speedX: burst ? (Math.random() - 0.5) * 6 : (Math.random() - 0.5) * 1,
-    speedY: burst ? Math.random() * 2 + 0.8 : 0.4 + Math.random() * 0.8,
-    opacity: 0.6 + Math.random() * 0.35,
+    rotationSpeed: (Math.random() - 0.5) * 2,
+    speedX: burst ? (Math.random() - 0.5) * 5 : (Math.random() - 0.5) * 0.8,
+    speedY: burst ? Math.random() * 1.5 + 0.5 : 0.3 + Math.random() * 0.6,
+    opacity: isSnow ? 0.7 + Math.random() * 0.3 : 0.5 + Math.random() * 0.3,
     color: COLORS[Math.floor(Math.random() * COLORS.length)],
     swayPhase: Math.random() * Math.PI * 2,
-    swaySpeed: 0.015 + Math.random() * 0.025,
-    shape: SHAPES[Math.floor(Math.random() * SHAPES.length)],
+    swaySpeed: 0.01 + Math.random() * 0.02,
+    shape: isSnow
+      ? snowShapes[Math.floor(Math.random() * snowShapes.length)]
+      : leafShapes[Math.floor(Math.random() * leafShapes.length)],
   };
 }
 
-function initLeaves() {
+function initElements() {
   const canvas = canvasRef.value;
   if (!canvas) return;
 
-  // Créer beaucoup de feuilles initiales réparties sur tout l'écran
-  const initialLeaves: Leaf[] = [];
-  for (let i = 0; i < 60; i++) {
-    const leaf = createLeaf();
-    leaf.y = Math.random() * canvas.height;
-    initialLeaves.push(leaf);
+  const initialElements: FallingElement[] = [];
+  for (let i = 0; i < 20; i++) {
+    const element = createFallingElement();
+    element.y = Math.random() * canvas.height;
+    initialElements.push(element);
   }
-  leaves.value = initialLeaves;
+  elements.value = initialElements;
 }
 
-// Dessiner une feuille d'érable
-function drawMapleLeaf(ctx: CanvasRenderingContext2D, s: number) {
+// Flocon classique à 6 branches
+function drawSnowflake(ctx: CanvasRenderingContext2D, s: number) {
+  const branches = 6;
+  for (let i = 0; i < branches; i++) {
+    ctx.save();
+    ctx.rotate((i * Math.PI * 2) / branches);
+
+    // Branche principale
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, -s);
+    ctx.stroke();
+
+    // Petites branches
+    ctx.beginPath();
+    ctx.moveTo(0, -s * 0.4);
+    ctx.lineTo(-s * 0.25, -s * 0.6);
+    ctx.moveTo(0, -s * 0.4);
+    ctx.lineTo(s * 0.25, -s * 0.6);
+    ctx.moveTo(0, -s * 0.7);
+    ctx.lineTo(-s * 0.15, -s * 0.85);
+    ctx.moveTo(0, -s * 0.7);
+    ctx.lineTo(s * 0.15, -s * 0.85);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+}
+
+// Flocon étoilé
+function drawSnowflake2(ctx: CanvasRenderingContext2D, s: number) {
+  const points = 6;
   ctx.beginPath();
-  ctx.moveTo(0, -s);
-  // Pointe gauche haute
-  ctx.lineTo(-s * 0.3, -s * 0.6);
-  ctx.lineTo(-s * 0.7, -s * 0.5);
-  ctx.lineTo(-s * 0.4, -s * 0.3);
-  // Pointe gauche basse
-  ctx.lineTo(-s * 0.8, 0);
-  ctx.lineTo(-s * 0.3, -s * 0.1);
-  ctx.lineTo(-s * 0.4, s * 0.3);
-  ctx.lineTo(-s * 0.15, s * 0.2);
-  // Tige
-  ctx.lineTo(0, s * 0.6);
-  // Côté droit (symétrique)
-  ctx.lineTo(s * 0.15, s * 0.2);
-  ctx.lineTo(s * 0.4, s * 0.3);
-  ctx.lineTo(s * 0.3, -s * 0.1);
-  ctx.lineTo(s * 0.8, 0);
-  ctx.lineTo(s * 0.4, -s * 0.3);
-  ctx.lineTo(s * 0.7, -s * 0.5);
-  ctx.lineTo(s * 0.3, -s * 0.6);
+  for (let i = 0; i < points * 2; i++) {
+    const radius = i % 2 === 0 ? s : s * 0.4;
+    const angle = (i * Math.PI) / points - Math.PI / 2;
+    const x = Math.cos(angle) * radius;
+    const y = Math.sin(angle) * radius;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
   ctx.closePath();
+  ctx.fill();
+
+  // Centre
+  ctx.beginPath();
+  ctx.arc(0, 0, s * 0.15, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(255,255,255,0.8)";
   ctx.fill();
 }
 
-// Dessiner une feuille de chêne
-function drawOakLeaf(ctx: CanvasRenderingContext2D, s: number) {
+// Flocon simple (point avec halo)
+function drawSimpleSnow(ctx: CanvasRenderingContext2D, s: number) {
+  // Halo
+  const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, s);
+  gradient.addColorStop(0, "rgba(255,255,255,0.9)");
+  gradient.addColorStop(0.5, "rgba(255,255,255,0.4)");
+  gradient.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = gradient;
   ctx.beginPath();
-  ctx.moveTo(0, -s);
-  // Lobes ondulés
-  ctx.quadraticCurveTo(-s * 0.2, -s * 0.8, -s * 0.5, -s * 0.7);
-  ctx.quadraticCurveTo(-s * 0.3, -s * 0.5, -s * 0.6, -s * 0.3);
-  ctx.quadraticCurveTo(-s * 0.3, -s * 0.1, -s * 0.5, s * 0.1);
-  ctx.quadraticCurveTo(-s * 0.2, s * 0.2, -s * 0.4, s * 0.4);
-  ctx.quadraticCurveTo(-s * 0.15, s * 0.5, 0, s * 0.7);
-  // Côté droit
-  ctx.quadraticCurveTo(s * 0.15, s * 0.5, s * 0.4, s * 0.4);
-  ctx.quadraticCurveTo(s * 0.2, s * 0.2, s * 0.5, s * 0.1);
-  ctx.quadraticCurveTo(s * 0.3, -s * 0.1, s * 0.6, -s * 0.3);
-  ctx.quadraticCurveTo(s * 0.3, -s * 0.5, s * 0.5, -s * 0.7);
-  ctx.quadraticCurveTo(s * 0.2, -s * 0.8, 0, -s);
-  ctx.closePath();
+  ctx.arc(0, 0, s, 0, Math.PI * 2);
   ctx.fill();
 }
 
-// Feuille simple ovale
-function drawSimpleLeaf(ctx: CanvasRenderingContext2D, s: number) {
+// Cristal de glace
+function drawIceCrystal(ctx: CanvasRenderingContext2D, s: number) {
+  ctx.beginPath();
+  // Hexagone
+  for (let i = 0; i < 6; i++) {
+    const angle = (i * Math.PI) / 3 - Math.PI / 2;
+    const x = Math.cos(angle) * s * 0.7;
+    const y = Math.sin(angle) * s * 0.7;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fill();
+
+  // Lignes internes
+  ctx.strokeStyle = "rgba(255,255,255,0.5)";
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 3; i++) {
+    const angle = (i * Math.PI) / 3;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(angle) * s * 0.7, Math.sin(angle) * s * 0.7);
+    ctx.lineTo(
+      Math.cos(angle + Math.PI) * s * 0.7,
+      Math.sin(angle + Math.PI) * s * 0.7,
+    );
+    ctx.stroke();
+  }
+}
+
+// Feuille givrée (feuille avec effet frost)
+function drawFrostLeaf(ctx: CanvasRenderingContext2D, s: number) {
   ctx.beginPath();
   ctx.moveTo(0, -s);
   ctx.bezierCurveTo(s * 0.5, -s * 0.7, s * 0.6, -s * 0.3, s * 0.3, 0);
@@ -151,115 +213,190 @@ function drawSimpleLeaf(ctx: CanvasRenderingContext2D, s: number) {
   ctx.bezierCurveTo(-s * 0.3, s * 0.7, -s * 0.5, s * 0.4, -s * 0.3, 0);
   ctx.bezierCurveTo(-s * 0.6, -s * 0.3, -s * 0.5, -s * 0.7, 0, -s);
   ctx.fill();
-}
 
-// Feuille ronde
-function drawRoundLeaf(ctx: CanvasRenderingContext2D, s: number) {
+  // Nervures givrées
+  ctx.strokeStyle = "rgba(255,255,255,0.4)";
+  ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.ellipse(0, 0, s * 0.6, s * 0.7, 0, 0, Math.PI * 2);
-  ctx.fill();
-  // Petite tige
-  ctx.beginPath();
-  ctx.moveTo(0, s * 0.7);
-  ctx.lineTo(0, s);
-  ctx.strokeStyle = "rgba(0,0,0,0.3)";
-  ctx.lineWidth = 2;
+  ctx.moveTo(0, -s * 0.8);
+  ctx.lineTo(0, s * 0.4);
+  ctx.moveTo(0, -s * 0.3);
+  ctx.lineTo(s * 0.2, -s * 0.5);
+  ctx.moveTo(0, -s * 0.3);
+  ctx.lineTo(-s * 0.2, -s * 0.5);
   ctx.stroke();
 }
 
-// Feuille longue (saule)
-function drawLongLeaf(ctx: CanvasRenderingContext2D, s: number) {
+// Feuille simple givrée
+function drawSimpleFrostLeaf(ctx: CanvasRenderingContext2D, s: number) {
   ctx.beginPath();
   ctx.moveTo(0, -s);
-  ctx.bezierCurveTo(s * 0.25, -s * 0.5, s * 0.25, s * 0.5, 0, s);
-  ctx.bezierCurveTo(-s * 0.25, s * 0.5, -s * 0.25, -s * 0.5, 0, -s);
+  ctx.lineTo(s * 0.4, -s * 0.3);
+  ctx.lineTo(s * 0.3, s * 0.5);
+  ctx.lineTo(0, s * 0.6);
+  ctx.lineTo(-s * 0.3, s * 0.5);
+  ctx.lineTo(-s * 0.4, -s * 0.3);
+  ctx.closePath();
   ctx.fill();
+
+  // Nervure centrale
+  ctx.strokeStyle = "rgba(255,255,255,0.4)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, -s);
+  ctx.lineTo(0, s * 0.6);
+  ctx.stroke();
 }
 
-function drawLeaf(
-  ctx: CanvasRenderingContext2D,
-  leaf: Leaf,
-  mouseInfluence: { dx: number; dy: number },
-) {
+// Feuille pointue
+function drawPointyLeaf(ctx: CanvasRenderingContext2D, s: number) {
+  // Feuille d'érable à 5 lobes
+  ctx.beginPath();
+
+  // Lobe central (haut)
+  ctx.moveTo(0, -s);
+  ctx.bezierCurveTo(s * 0.15, -s * 0.7, s * 0.2, -s * 0.3, s * 0.1, 0);
+
+  // Lobe haut droit
+  ctx.bezierCurveTo(s * 0.3, -s * 0.5, s * 0.5, -s * 0.4, s * 0.55, -s * 0.1);
+
+  // Lobe bas droit
+  ctx.bezierCurveTo(s * 0.6, s * 0.1, s * 0.45, s * 0.4, s * 0.25, s * 0.4);
+
+  // Lobe bas gauche
+  ctx.bezierCurveTo(s * 0.2, s * 0.5, -s * 0.2, s * 0.5, -s * 0.25, s * 0.4);
+
+  // Lobe haut gauche
+  ctx.bezierCurveTo(-s * 0.45, s * 0.4, -s * 0.6, s * 0.1, -s * 0.55, -s * 0.1);
+
+  // Retour au centre
+  ctx.bezierCurveTo(-s * 0.5, -s * 0.4, -s * 0.3, -s * 0.5, -s * 0.1, 0);
+
+  ctx.closePath();
+  ctx.fill();
+
+  // Nervures d'érable (nervures principales)
+  ctx.strokeStyle = "rgba(255,255,255,0.3)";
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  // Nervure centrale
+  ctx.moveTo(0, 0);
+  ctx.lineTo(0, s * 0.5);
+  // Nervures latérales
+  ctx.moveTo(0, 0);
+  ctx.lineTo(s * 0.4, -s * 0.3);
+  ctx.moveTo(0, 0);
+  ctx.lineTo(s * 0.5, s * 0.1);
+  ctx.moveTo(0, 0);
+  ctx.lineTo(-s * 0.4, -s * 0.3);
+  ctx.moveTo(0, 0);
+  ctx.lineTo(-s * 0.5, s * 0.1);
+  ctx.stroke();
+}
+
+// Feuille arrondie
+function drawRoundFrostLeaf(ctx: CanvasRenderingContext2D, s: number) {
+  ctx.beginPath();
+  ctx.moveTo(0, -s);
+  ctx.bezierCurveTo(s * 0.3, -s * 0.7, s * 0.4, -s * 0.2, s * 0.35, s * 0.3);
+  ctx.bezierCurveTo(s * 0.3, s * 0.6, s * 0.1, s * 0.7, 0, s * 0.5);
+  ctx.bezierCurveTo(-s * 0.1, s * 0.7, -s * 0.3, s * 0.6, -s * 0.35, s * 0.3);
+  ctx.bezierCurveTo(-s * 0.4, -s * 0.2, -s * 0.3, -s * 0.7, 0, -s);
+  ctx.fill();
+
+  // Nervures givrées légères
+  ctx.strokeStyle = "rgba(255,255,255,0.25)";
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(0, -s * 0.8);
+  ctx.lineTo(0, s * 0.3);
+  ctx.stroke();
+}
+
+function drawElement(ctx: CanvasRenderingContext2D, element: FallingElement) {
   ctx.save();
 
-  const drawX = leaf.x + mouseInfluence.dx;
-  const drawY = leaf.y + mouseInfluence.dy;
+  ctx.translate(element.x, element.y);
+  ctx.rotate((element.rotation * Math.PI) / 180);
+  ctx.globalAlpha = element.opacity;
+  ctx.fillStyle = element.color;
+  ctx.strokeStyle = element.color;
+  ctx.lineWidth = 1.5;
 
-  ctx.translate(drawX, drawY);
-  ctx.rotate((leaf.rotation * Math.PI) / 180);
-  ctx.globalAlpha = leaf.opacity;
-  ctx.fillStyle = leaf.color;
+  const s = element.size;
 
-  const s = leaf.size;
-
-  // Dessiner selon la forme
-  switch (leaf.shape) {
-    case "maple":
-      drawMapleLeaf(ctx, s);
-      break;
-    case "oak":
-      drawOakLeaf(ctx, s);
-      break;
-    case "round":
-      drawRoundLeaf(ctx, s);
-      break;
-    case "long":
-      drawLongLeaf(ctx, s);
-      break;
-    default:
-      drawSimpleLeaf(ctx, s);
+  // Ajouter un léger glow pour les feuilles (pas les flocons purs)
+  if (!element.shape.includes("snowflake") && element.shape !== "simple-snow") {
+    ctx.shadowColor = element.color;
+    ctx.shadowBlur = s * 0.25;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
   }
 
-  // Nervure centrale (sauf pour round)
-  if (leaf.shape !== "round") {
-    ctx.beginPath();
-    ctx.strokeStyle = "rgba(255,255,255,0.25)";
-    ctx.lineWidth = 1;
-    ctx.moveTo(0, -s * 0.7);
-    ctx.lineTo(0, s * 0.4);
-    ctx.stroke();
+  switch (element.shape) {
+    case "snowflake":
+      drawSnowflake(ctx, s);
+      break;
+    case "snowflake2":
+      drawSnowflake2(ctx, s);
+      break;
+    case "simple-snow":
+      drawSimpleSnow(ctx, s);
+      break;
+    case "ice-crystal":
+      drawIceCrystal(ctx, s);
+      break;
+    case "leaf-frost":
+      drawFrostLeaf(ctx, s);
+      break;
+    case "leaf-simple":
+      drawSimpleFrostLeaf(ctx, s);
+      break;
+    case "leaf-pointy":
+      drawPointyLeaf(ctx, s);
+      break;
+    case "leaf-round":
+      drawRoundFrostLeaf(ctx, s);
+      break;
   }
 
   ctx.restore();
 }
 
-function updateLeaves() {
+function updateElements() {
   const canvas = canvasRef.value;
   if (!canvas) return;
 
-  leaves.value = leaves.value
-    .map((leaf) => {
-      leaf.swayPhase += leaf.swaySpeed;
-      const sway = Math.sin(leaf.swayPhase) * 2;
+  elements.value = elements.value
+    .map((el) => {
+      el.swayPhase += el.swaySpeed;
+      const sway = Math.sin(el.swayPhase) * 1.5;
 
-      leaf.x += leaf.speedX + sway;
-      leaf.y += leaf.speedY;
-      leaf.rotation += leaf.rotationSpeed;
-      leaf.speedX *= 0.995;
+      el.x += el.speedX + sway;
+      el.y += el.speedY;
+      el.rotation += el.rotationSpeed;
+      el.speedX *= 0.995;
 
-      return leaf;
+      return el;
     })
-    .filter((leaf) => {
+    .filter((el) => {
       return (
-        leaf.y < canvas.height + 50 &&
-        leaf.x > -50 &&
-        leaf.x < canvas.width + 50
+        el.y < canvas.height + 50 && el.x > -50 && el.x < canvas.width + 50
       );
     });
 
-  // Ajouter de nouvelles feuilles en continu
-  const targetCount = 70;
-  const spawnRate = 0.15; // Plus de chances de spawn
+  // Ajouter de nouveaux éléments en continu
+  const targetCount = 25;
+  const spawnRate = 0.06;
 
-  if (leaves.value.length < targetCount && Math.random() < spawnRate) {
-    leaves.value.push(createLeaf());
+  if (elements.value.length < targetCount && Math.random() < spawnRate) {
+    elements.value.push(createFallingElement());
   }
 
-  // Spawn multiple si vraiment peu de feuilles
-  if (leaves.value.length < 40) {
+  // Spawn multiple si vraiment peu d'éléments
+  if (elements.value.length < 50) {
     for (let i = 0; i < 3; i++) {
-      leaves.value.push(createLeaf());
+      elements.value.push(createFallingElement());
     }
   }
 }
@@ -271,12 +408,11 @@ function render() {
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Dessiner toutes les feuilles sans effet d'évitement
-  for (const leaf of leaves.value) {
-    drawLeaf(ctx, leaf, { dx: 0, dy: 0 });
+  for (const element of elements.value) {
+    drawElement(ctx, element);
   }
 
-  updateLeaves();
+  updateElements();
   animationId.value = requestAnimationFrame(render);
 }
 
@@ -288,14 +424,14 @@ function handleResize() {
 }
 
 function handleClick(e: MouseEvent) {
-  const burstCount = 10 + Math.floor(Math.random() * 8);
+  const burstCount = 12 + Math.floor(Math.random() * 10);
   for (let i = 0; i < burstCount; i++) {
-    const leaf = createLeaf(e.clientX, e.clientY, true);
+    const element = createFallingElement(e.clientX, e.clientY, true);
     const angle = (i / burstCount) * Math.PI * 2 + Math.random() * 0.5;
-    const speed = 3 + Math.random() * 5;
-    leaf.speedX = Math.cos(angle) * speed;
-    leaf.speedY = Math.sin(angle) * speed + 1;
-    leaves.value.push(leaf);
+    const speed = 2 + Math.random() * 4;
+    element.speedX = Math.cos(angle) * speed;
+    element.speedY = Math.sin(angle) * speed + 0.5;
+    elements.value.push(element);
   }
 }
 
@@ -303,7 +439,7 @@ onMounted(() => {
   handleResize();
   window.addEventListener("resize", handleResize);
   window.addEventListener("click", handleClick);
-  initLeaves();
+  initElements();
   render();
 });
 
@@ -317,11 +453,11 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <canvas ref="canvasRef" class="falling-leaves-canvas" />
+  <canvas ref="canvasRef" class="falling-snow-canvas" />
 </template>
 
 <style scoped>
-.falling-leaves-canvas {
+.falling-snow-canvas {
   position: fixed;
   top: 0;
   left: 0;
