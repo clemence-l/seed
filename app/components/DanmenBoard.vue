@@ -407,35 +407,16 @@ function countLineStats(cells: CellState[]): { count: number; groups: number } {
 }
 
 function checkLevelComplete() {
-  console.log(
-    "[DanmenBoard] checkLevelComplete called, levelComplete=",
-    levelComplete.value,
-  );
   if (levelComplete.value) return;
   const n = size.value;
-  console.log("[DanmenBoard] Checking grid size:", n);
   // Vérifier toutes les lignes
   for (let r = 0; r < n; r++) {
     const row = grid.value[r] ?? [];
     const rule = props.level.rules.rows[r];
-    if (!rule) {
-      console.log("[DanmenBoard] No rule for row", r);
-      return;
-    }
+    if (!rule) return;
     const stats = countLineStats(row);
-    if (stats.count !== rule.count || stats.groups !== rule.groups) {
-      console.log(
-        "[DanmenBoard] Row",
-        r,
-        "failed: stats=",
-        stats,
-        "rule=",
-        rule,
-      );
-      return;
-    }
+    if (stats.count !== rule.count || stats.groups !== rule.groups) return;
   }
-  console.log("[DanmenBoard] All rows passed!");
   // Vérifier toutes les colonnes
   for (let c = 0; c < n; c++) {
     const col: CellState[] = [];
@@ -443,24 +424,10 @@ function checkLevelComplete() {
       col.push(grid.value[r]?.[c] ?? "unknown");
     }
     const rule = props.level.rules.cols[c];
-    if (!rule) {
-      console.log("[DanmenBoard] No rule for col", c);
-      return;
-    }
+    if (!rule) return;
     const stats = countLineStats(col);
-    if (stats.count !== rule.count || stats.groups !== rule.groups) {
-      console.log(
-        "[DanmenBoard] Col",
-        c,
-        "failed: stats=",
-        stats,
-        "rule=",
-        rule,
-      );
-      return;
-    }
+    if (stats.count !== rule.count || stats.groups !== rule.groups) return;
   }
-  console.log("[DanmenBoard] All cols passed! Level complete!");
   levelComplete.value = true;
   emit("complete");
 }

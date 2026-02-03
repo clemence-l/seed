@@ -226,9 +226,7 @@ function scrollToLastLeaf() {
 onMounted(async () => {
   try {
     const state = await progress.getPlantState();
-    console.log("[progress.vue] state reçu:", state);
     plants.value = state.plants;
-    console.log("[progress.vue] plants.value assigné:", plants.value);
     streak.value = state.totalStreak ?? 0;
     currentPlantIndex.value = state.currentPlantIndex ?? 0;
 
@@ -239,8 +237,8 @@ onMounted(async () => {
       stage.value = 0;
       encouragement.value = "Commence à jouer pour faire pousser ta plante !";
     }
-  } catch (e) {
-    console.error(e);
+  } catch {
+    // Erreur silencieuse
   } finally {
     loading.value = false;
 

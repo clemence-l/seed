@@ -304,13 +304,8 @@ const playId = ref<string | null>(null);
 const router = useRouter();
 
 async function handleComplete(): Promise<void> {
-  console.log("[GamePage] handleComplete called");
   const id = currentLevelId.value;
-  if (!id) {
-    console.log("[GamePage] No level id, returning");
-    return;
-  }
-  console.log("[GamePage] Level id:", id);
+  if (!id) return;
   isCompleted.value = true;
 
   // stop + persist "completed"
@@ -321,33 +316,18 @@ async function handleComplete(): Promise<void> {
   // Récupérer stats du board
   const movesCount = boardRef.value?.getMoves?.() ?? 0;
   const gridSnapshot: CellState[][] = boardRef.value?.getGrid?.() ?? [];
-  console.log(
-    "[GamePage] Stats: moves=",
-    movesCount,
-    "time=",
-    elapsedSeconds.value,
-  );
 
   // Enregistrer le play en base UNIQUEMENT si connecté
   if (auth.isLoggedIn.value && playId.value) {
-    console.log("[GamePage] Saving play to DB, playId=", playId.value);
     try {
       await plays.completePlay(playId.value, id, {
         timeSpentSeconds: elapsedSeconds.value,
         moves: movesCount,
         success: true,
       });
-      console.log("[GamePage] Play saved successfully");
-    } catch (e) {
-      console.error("[GamePage] Error saving play:", e);
+    } catch {
+      // Erreur silencieuse
     }
-  } else {
-    console.log(
-      "[GamePage] Not saving play - isLoggedIn:",
-      auth.isLoggedIn.value,
-      "playId:",
-      playId.value,
-    );
   }
 
   // Sauvegarder les stats pour la page bravo en sessionStorage
@@ -362,12 +342,10 @@ async function handleComplete(): Promise<void> {
       colCounts: level.value?.colCounts ?? [],
     };
     sessionStorage.setItem(`seed:bravo:${id}`, JSON.stringify(bravoData));
-    console.log("[GamePage] Bravo data saved to sessionStorage");
   }
 
   // Naviguer vers la page bravo
   const targetPath = `/games/${gameName.value}/bravo`;
-  console.log("[GamePage] Navigating to:", targetPath);
   await router.push({
     path: targetPath,
     query: { levelId: id, day: day.value },

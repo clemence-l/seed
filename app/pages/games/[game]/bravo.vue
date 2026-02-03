@@ -9,14 +9,6 @@ definePageMeta({
   layout: "minimal",
 });
 
-// Déclarations globales propres pour éviter les // @ts-ignore
-declare global {
-  interface Window {
-    __bravo_onError?: EventListener;
-    __bravo_onRejection?: EventListener;
-  }
-}
-
 const route = useRoute();
 const router = useRouter();
 const auth = useAuth();
@@ -108,42 +100,19 @@ function stopSolutionAnimation() {
 onMounted(async () => {
   if (!import.meta.client) return;
 
-  // Installer des écouteurs d'erreurs runtime pour aider au debug client
-  const __bravo_onError: EventListener = (ev) => {
-    const e = ev as ErrorEvent;
-    console.error("[BRAVO] runtime error:", e.error ?? e.message);
-  };
-  const __bravo_onRejection: EventListener = (ev) => {
-    const e = ev as PromiseRejectionEvent;
-    console.error("[BRAVO] unhandled rejection:", e.reason);
-  };
-  window.__bravo_onError = __bravo_onError;
-  window.__bravo_onRejection = __bravo_onRejection;
-  window.addEventListener("error", __bravo_onError);
-  window.addEventListener("unhandledrejection", __bravo_onRejection);
-
   // S'assurer que auth est initialisé
   await auth.initAuth();
 
-  console.log("[BRAVO] levelId:", levelId.value, "dayParam:", dayParam.value);
-  console.log(
-    "[BRAVO] isLoggedIn:",
-    auth.isLoggedIn.value,
-    "userId:",
-    auth.user.value?.id,
-  );
-
   // 1. Essayer de récupérer depuis sessionStorage (cas normal après victoire)
   const raw = sessionStorage.getItem(`seed:bravo:${levelId.value}`);
-  console.log("[BRAVO] sessionStorage raw:", raw ? "found" : "not found");
   if (raw) {
     try {
       bravoData.value = JSON.parse(raw) as BravoData;
       loading.value = false;
       startSolutionAnimation();
       return;
-    } catch (e) {
-      console.error("[BRAVO] sessionStorage parse error:", e);
+    } catch {
+      // Erreur de parsing, continuer vers la base
     }
   }
 
@@ -152,33 +121,23 @@ onMounted(async () => {
 
   // Vérifier que dayParam est présent (on utilise game_id + day pour trouver le niveau)
   if (!dayParam.value) {
-    console.error("[BRAVO] No day in query params");
     loading.value = false;
     return;
   }
 
   try {
     // Récupérer les données du niveau par game_id + day (pas par l'id interne)
-    console.log(
-      "[BRAVO] Fetching level data for game:",
-      gameName.value,
-      "day:",
-      dayParam.value,
-    );
-    const { data: levelData, error: levelError } = await $supabase
+    const { data: levelData } = await $supabase
       .from("levels")
       .select("data, day")
       .eq("game_id", gameName.value)
       .eq("day", dayParam.value)
       .maybeSingle();
 
-    console.log("[BRAVO] Level data:", levelData, "error:", levelError);
-
-    // Ensuite récupérer le play si l'utilisateur est connecté
+    // Récupérer le play si l'utilisateur est connecté
     let play = null;
     if (auth.isLoggedIn.value && auth.user.value?.id) {
-      console.log("[BRAVO] Fetching play for user:", auth.user.value.id);
-      const { data: playData, error: playError } = await $supabase
+      const { data: playData } = await $supabase
         .from("plays")
         .select("time_spent_seconds, moves, completed_at")
         .eq("level_id", levelId.value)
@@ -188,7 +147,6 @@ onMounted(async () => {
         .limit(1)
         .maybeSingle();
       play = playData;
-      console.log("[BRAVO] Play data:", playData, "error:", playError);
     }
 
     if (levelData) {
@@ -202,13 +160,10 @@ onMounted(async () => {
         rowCounts: levelContent.rowCounts ?? [],
         colCounts: levelContent.colCounts ?? [],
       };
-      console.log("[BRAVO] bravoData set:", bravoData.value);
       startSolutionAnimation();
-    } else {
-      console.log("[BRAVO] No level data found");
     }
-  } catch (error) {
-    console.error("[BRAVO] Erreur lors du chargement:", error);
+  } catch {
+    // Erreur silencieuse
   } finally {
     loading.value = false;
   }
@@ -216,16 +171,6 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   stopSolutionAnimation();
-  try {
-    const h1 = window.__bravo_onError as EventListener | undefined;
-    const h2 = window.__bravo_onRejection as EventListener | undefined;
-    if (h1) window.removeEventListener("error", h1);
-    if (h2) window.removeEventListener("unhandledrejection", h2);
-    delete window.__bravo_onError;
-    delete window.__bravo_onRejection;
-  } catch {
-    // noop
-  }
 });
 
 const formattedTime = computed(() => {

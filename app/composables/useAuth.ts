@@ -114,8 +114,6 @@ export function useAuth() {
     const supabase = getSupabase();
     const name = normalizeName(displayName);
 
-    console.log("[useAuth] updateDisplayName called", name);
-
     if (!state.user) return { success: false, error: "Non connecté" };
     if (!name) return { success: false, error: "Nom invalide" };
 
@@ -123,21 +121,17 @@ export function useAuth() {
     state.error = null;
 
     try {
-      console.log("[useAuth] calling supabase.auth.updateUser");
       const { data, error } = await supabase.auth.updateUser({
         data: { display_name: name },
       });
-      console.log("[useAuth] supabase response", { data, error });
       if (error) throw error;
 
       // supabase renvoie l'utilisateur mis à jour
       state.user = data.user ?? state.user;
-      console.log("[useAuth] state.user updated, returning success");
 
       return { success: true };
     } catch (e: unknown) {
       const message = getErrorMessage(e, "Erreur lors de la mise à jour");
-      console.error("[useAuth] updateDisplayName error", e);
       state.error = message;
       return { success: false, error: message };
     } finally {
@@ -151,8 +145,6 @@ export function useAuth() {
   ): Promise<{ success: boolean; error?: string }> {
     const supabase = getSupabase();
 
-    console.log("[useAuth] updateEmail called", newEmail);
-
     if (!state.user) return { success: false, error: "Non connecté" };
     if (!newEmail.trim()) return { success: false, error: "Email invalide" };
 
@@ -161,7 +153,6 @@ export function useAuth() {
 
     try {
       const { error } = await supabase.auth.updateUser({ email: newEmail });
-      console.log("[useAuth] updateEmail response error", error);
       if (error) throw error;
       return { success: true };
     } catch (e: unknown) {
@@ -169,7 +160,6 @@ export function useAuth() {
         e,
         "Erreur lors de la mise à jour de l'email",
       );
-      console.error("[useAuth] updateEmail caught", e);
       state.error = message;
       return { success: false, error: message };
     } finally {

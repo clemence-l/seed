@@ -58,19 +58,12 @@ export function useProgress() {
         .limit(1);
 
       if (error) {
-        console.error("[useProgress] isLevelAlreadyWon error:", error);
         // Si c'est une erreur UUID, retourner false au lieu de throw
-        if (error.message.includes("uuid")) {
-          console.warn(
-            "[useProgress] level_id is not a valid UUID, returning false",
-          );
-          return false;
-        }
+        if (error.message.includes("uuid")) return false;
         throw new Error(error.message);
       }
       return (data?.length ?? 0) > 0;
-    } catch (err) {
-      console.error("[useProgress] isLevelAlreadyWon caught error:", err);
+    } catch {
       return false;
     }
   }
@@ -78,11 +71,7 @@ export function useProgress() {
   // Crée ou récupère un play 'started'. Retourne l'id du play.
   async function startPlay(levelId: string): Promise<string> {
     const user = auth.user.value;
-    console.log("[useProgress] startPlay called", { levelId, user: user?.id });
-    if (!user) {
-      console.error("[useProgress] startPlay: NOT_AUTHENTICATED");
-      throw new Error("NOT_AUTHENTICATED");
-    }
+    if (!user) throw new Error("NOT_AUTHENTICATED");
 
     // Chercher un started existant
     const existingRes = (await supabase()
@@ -99,23 +88,14 @@ export function useProgress() {
       created_at: string;
     }>;
 
-    console.log("[useProgress] existing play check:", existingRes);
     if (existingRes.error) {
-      console.error(
-        "[useProgress] error checking existing play:",
-        existingRes.error,
-      );
       // Si c'est une erreur UUID, on ne peut pas utiliser plays avec cet ID
       if (existingRes.error.message.includes("uuid")) {
-        console.warn(
-          "[useProgress] level_id is not a valid UUID, cannot use plays table",
-        );
         throw new Error("INVALID_LEVEL_ID");
       }
       throw new Error(existingRes.error.message);
     }
     if (existingRes.data && existingRes.data.id) {
-      console.log("[useProgress] reusing existing play:", existingRes.data.id);
       return existingRes.data.id;
     }
 
@@ -125,8 +105,6 @@ export function useProgress() {
       status: "started",
       success: null,
     };
-    console.log("[useProgress] inserting new play:", payload);
-
     const res = (await supabase()
       .from("plays")
       .insert(
@@ -134,18 +112,12 @@ export function useProgress() {
       )
       .select("id")
       .single()) as PostgrestSingleResponse<PlayRow>;
-    console.log("[useProgress] insert result:", res);
     if (res.error) {
-      console.error("[useProgress] insert error:", res.error);
       if (res.error.message.includes("uuid")) {
-        console.warn(
-          "[useProgress] level_id is not a valid UUID, cannot insert into plays table",
-        );
         throw new Error("INVALID_LEVEL_ID");
       }
       throw new Error(res.error.message);
     }
-    console.log("[useProgress] new play created:", res.data.id);
     return res.data.id;
   }
 
@@ -156,22 +128,10 @@ export function useProgress() {
     payload: { timeSpentSeconds: number; moves: number; success: boolean },
   ): Promise<void> {
     const user = auth.user.value;
-    console.log("[useProgress] completePlay called", {
-      playId,
-      levelId,
-      payload,
-      user: user?.id,
-    });
-    if (!user) {
-      console.error("[useProgress] completePlay: NOT_AUTHENTICATED");
-      throw new Error("NOT_AUTHENTICATED");
-    }
+    if (!user) throw new Error("NOT_AUTHENTICATED");
 
     let idToUpdate = playId;
     if (!idToUpdate) {
-      console.log(
-        "[useProgress] completePlay: no playId, searching for started play",
-      );
       const startedRes = (await supabase()
         .from("plays")
         .select("id")
@@ -181,12 +141,7 @@ export function useProgress() {
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle()) as PostgrestSingleResponse<{ id: string }>;
-      console.log("[useProgress] completePlay: startedRes", startedRes);
       if (startedRes.error) {
-        console.error(
-          "[useProgress] completePlay: error searching started play",
-          startedRes.error,
-        );
         throw new Error(startedRes.error.message);
       }
       idToUpdate = startedRes.data?.id ?? null;
@@ -199,12 +154,6 @@ export function useProgress() {
       time_spent_seconds: payload.timeSpentSeconds,
       moves: payload.moves,
     };
-    console.log(
-      "[useProgress] completePlay: idToUpdate=",
-      idToUpdate,
-      "patch=",
-      patch,
-    );
 
     if (idToUpdate) {
       const { error } = await supabase()
@@ -214,16 +163,11 @@ export function useProgress() {
         )
         .eq("id", idToUpdate)
         .eq("user_id", user.id);
-      if (error) {
-        console.error("[useProgress] completePlay: update error", error);
-        throw new Error(error.message);
-      }
-      console.log("[useProgress] completePlay: update success");
+      if (error) throw new Error(error.message);
       return;
     }
 
     // Fallback: insert a completed row (rare)
-    console.log("[useProgress] completePlay: fallback insert");
     const insertPayload: PlayInsert = {
       user_id: user.id,
       level_id: levelId,
@@ -319,8 +263,6 @@ export function useProgress() {
     // Dédupliquer les jours (peut y avoir plusieurs plays le même jour)
     days = [...new Set(days)];
 
-    console.log("[getPlantState] Jours complétés (DESC, dédupliqués):", days);
-
     if (days.length === 0)
       return { plants: [], totalStreak: 0, currentPlantIndex: 0 };
 
@@ -338,10 +280,6 @@ export function useProgress() {
         (prevDate.getTime() - currDate.getTime()) / (1000 * 60 * 60 * 24),
       );
 
-      console.log(
-        `[getPlantState] Comparaison: ${prev} vs ${curr}, diffDays=${diffDays}`,
-      );
-
       if (diffDays === 1) {
         // Jour consécutif, ajouter au groupe
         currentGroup.push(curr);
@@ -351,10 +289,6 @@ export function useProgress() {
         continue;
       } else {
         // Trou trouvé, sauvegarder le groupe actuel et commencer un nouveau
-        console.log(
-          `[getPlantState] Trou détecté! Groupe actuel:`,
-          currentGroup,
-        );
         plants.push({
           stage: currentGroup.length,
           startDate: currentGroup[currentGroup.length - 1]!,
@@ -367,7 +301,6 @@ export function useProgress() {
 
     // Ajouter le dernier groupe
     if (currentGroup.length > 0) {
-      console.log(`[getPlantState] Dernier groupe:`, currentGroup);
       plants.push({
         stage: currentGroup.length,
         startDate: currentGroup[currentGroup.length - 1]!,
@@ -375,12 +308,8 @@ export function useProgress() {
       });
     }
 
-    console.log(`[getPlantState] Plantes avant reverse:`, plants);
-
     // Inverser pour avoir le plus ancien d'abord
     plants.reverse();
-
-    console.log(`[getPlantState] Plantes après reverse:`, plants);
 
     // Calculer la streak totale
     let totalStreak = 0;
@@ -435,10 +364,7 @@ export function useProgress() {
       .lte("completed_at", endDatetime)
       .order("completed_at", { ascending: true });
 
-    if (error) {
-      console.error("[getPlaysForDateRange] error:", error);
-      return [];
-    }
+    if (error) return [];
 
     // Grouper par jour et prendre le meilleur play de chaque jour (moins de coups)
     const byDay = new Map<
