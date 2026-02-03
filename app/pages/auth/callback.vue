@@ -57,7 +57,7 @@ onMounted(async () => {
     <div class="text-center max-w-md">
       <!-- Loading state -->
       <div v-if="loading" class="space-y-4">
-        <UiSpinner class="mx-auto w-12 h-12 text-purple-500" />
+        <UiSpinner size="xl" class="mx-auto" />
         <h1 class="text-2xl font-medium text-dark-500">
           Connexion en cours...
         </h1>

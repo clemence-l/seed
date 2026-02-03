@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, nextTick } from "vue";
 import { useProgress } from "~/composables/useProgress";
 
 definePageMeta({
@@ -11,65 +11,310 @@ const stage = ref(0);
 const streak = ref(0);
 const encouragement = ref("");
 
+// Multiple plants
+const plants = ref<
+  Array<{ stage: number; startDate: string; endDate: string }>
+>([]);
+const currentPlantIndex = ref(0);
+
+// Popup stats
+const showStatsPopup = ref(false);
+const selectedLeaf = ref<number | null>(null);
+const leafStats = ref<{
+  date: string;
+  moves: number | null;
+  timeSpentSeconds: number | null;
+} | null>(null);
+
+// Ref pour scroll
+const plantContainer = ref<HTMLElement | null>(null);
+
 const progress = useProgress();
+
+// Plant actuelle
+const currentPlant = computed(() => plants.value[currentPlantIndex.value]);
+
+// Stats des plays par plante (indexé par plantIndex, puis par feuille 1-5)
+const plantsPlayData = ref<
+  Map<
+    number,
+    Array<{
+      date: string;
+      moves: number | null;
+      timeSpentSeconds: number | null;
+    }>
+  >
+>(new Map());
+
+// Formatter le temps en minutes:secondes
+function formatTime(seconds: number | null): string {
+  if (seconds === null || seconds === undefined) return "--:--";
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
+// Formatter la date en français
+function formatDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+async function onLeafClick(leafNum: number) {
+  const plantIdx = currentPlantIndex.value;
+  const plant = plants.value[plantIdx];
+  if (!plant) return;
+
+  // Charger les données si pas encore en cache
+  if (!plantsPlayData.value.has(plantIdx)) {
+    const plays = await progress.getPlaysForDateRange(
+      plant.startDate,
+      plant.endDate,
+    );
+    plantsPlayData.value.set(plantIdx, plays);
+  }
+
+  const plays = plantsPlayData.value.get(plantIdx) ?? [];
+  // La feuille N correspond au Nème jour (index N-1)
+  const playData = plays[leafNum - 1];
+
+  selectedLeaf.value = leafNum;
+  if (playData) {
+    leafStats.value = {
+      date: formatDate(playData.date),
+      moves: playData.moves,
+      timeSpentSeconds: playData.timeSpentSeconds,
+    };
+  } else {
+    leafStats.value = null;
+  }
+  showStatsPopup.value = true;
+}
+
+function closePopup() {
+  showStatsPopup.value = false;
+  selectedLeaf.value = null;
+}
+
+// Navigation entre plantes
+function previousPlant() {
+  if (currentPlantIndex.value > 0) {
+    currentPlantIndex.value--;
+    stage.value = currentPlant.value.stage;
+    updateEncouragement();
+  }
+}
+
+function nextPlant() {
+  if (currentPlantIndex.value < plants.value.length - 1) {
+    currentPlantIndex.value++;
+    stage.value = currentPlant.value.stage;
+    updateEncouragement();
+  }
+}
+
+// Sélectionner une plante par clic
+function selectPlant(index: number) {
+  if (index !== currentPlantIndex.value) {
+    currentPlantIndex.value = index;
+    stage.value = plants.value[index].stage;
+    updateEncouragement();
+  }
+}
+
+// Offset du carousel pour centrer la plante active
+const PLANT_WIDTH = 200; // largeur d'une plante inactive
+const ACTIVE_PLANT_WIDTH = 400; // largeur de la plante active
+
+const carouselOffset = computed(() => {
+  const total = plants.value.length;
+  if (total <= 1) return 0;
+
+  // Calculer la largeur totale du carousel
+  // = (total - 1) plantes inactives + 1 plante active
+  const totalWidth = (total - 1) * PLANT_WIDTH + ACTIVE_PLANT_WIDTH;
+
+  // Position du centre de la plante active dans le carousel
+  // Les plantes avant l'active sont inactives (PLANT_WIDTH chacune)
+  const positionOfActiveCenter =
+    currentPlantIndex.value * PLANT_WIDTH + ACTIVE_PLANT_WIDTH / 2;
+
+  // On veut que ce centre soit au milieu du carousel (totalWidth / 2)
+  // Donc on décale de: (totalWidth / 2) - positionOfActiveCenter
+  const offset = totalWidth / 2 - positionOfActiveCenter;
+
+  return offset;
+});
+
+// ViewBox dynamique pour une plante donnée
+function getViewBoxForStage(stg: number) {
+  const viewBoxStartY: Record<number, number> = {
+    0: 650,
+    1: 550,
+    2: 470,
+    3: 380,
+    4: 280,
+    5: 0,
+  };
+  const startY = viewBoxStartY[stg] ?? 550;
+  const height = 800 - startY;
+  return `0 ${startY} 400 ${height}`;
+}
+
+// Chemin de tige pour une plante donnée
+function getStemPathForStage(stg: number) {
+  const stemEndY: Record<number, number> = {
+    1: 600,
+    2: 520,
+    3: 430,
+    4: 340,
+    5: 180,
+  };
+  const endY = stemEndY[stg] ?? 600;
+  return `M200 740 L200 ${endY}`;
+}
+
+function updateEncouragement() {
+  const stg = stage.value;
+  const isLastPlant = currentPlantIndex.value === plants.value.length - 1;
+  if (stg >= 5) {
+    encouragement.value = isLastPlant
+      ? "Ta plante est épanouie — bravo !"
+      : "Magnifique plante !";
+  } else {
+    encouragement.value = isLastPlant
+      ? "Prends soin de ta plante en jouant chaque jour."
+      : "Beau parcours !";
+  }
+}
+
+// Scroll vers la dernière feuille visible
+function scrollToLastLeaf() {
+  if (!plantContainer.value) return;
+
+  // Position Y approximative de chaque feuille dans le SVG (viewBox 800)
+  const leafPositions: Record<number, number> = {
+    1: 620, // feuille 1
+    2: 540, // feuille 2
+    3: 450, // feuille 3
+    4: 360, // feuille 4
+    5: 220, // feuille 5/6 (fleur)
+  };
+
+  const targetLeaf = Math.min(stage.value, 5);
+  if (targetLeaf === 0) return;
+
+  // Calculer le scroll pour centrer sur la dernière feuille
+  const svgHeight = plantContainer.value.scrollHeight;
+  const viewportHeight = window.innerHeight;
+  const leafY = leafPositions[targetLeaf] ?? 400;
+
+  // Ratio pour convertir coordonnées SVG en pixels
+  const ratio = svgHeight / 800;
+  const scrollTarget = leafY * ratio - viewportHeight / 2;
+
+  plantContainer.value.scrollTo({
+    top: Math.max(0, scrollTarget),
+    behavior: "smooth",
+  });
+}
 
 onMounted(async () => {
   try {
     const state = await progress.getPlantState();
-    streak.value = state.streak ?? 0;
-    stage.value = Math.min(5, state.stage ?? 0);
-    encouragement.value =
-      stage.value >= 5
-        ? "Ta plante est épanouie — bravo !"
-        : "Prends soin de ta plante en jouant chaque jour.";
+    console.log("[progress.vue] state reçu:", state);
+    plants.value = state.plants;
+    console.log("[progress.vue] plants.value assigné:", plants.value);
+    streak.value = state.totalStreak ?? 0;
+    currentPlantIndex.value = state.currentPlantIndex ?? 0;
+
+    if (plants.value.length > 0) {
+      stage.value = Math.min(5, plants.value[currentPlantIndex.value].stage);
+      updateEncouragement();
+    } else {
+      stage.value = 0;
+      encouragement.value = "Commence à jouer pour faire pousser ta plante !";
+    }
   } catch (e) {
     console.error(e);
   } finally {
     loading.value = false;
+
+    // Scroll vers la dernière feuille après rendu
+    await nextTick();
+    setTimeout(() => scrollToLastLeaf(), 300);
   }
 });
 </script>
 
 <template>
-  <div class="progress-page min-h-dvh relative overflow-hidden">
-    <!-- Décor discret : léger halo au sol (plus naturel que des étoiles) -->
+  <div
+    ref="plantContainer"
+    class="progress-page min-h-screen h-screen relative overflow-hidden flex flex-col"
+  >
+    <!-- Feuilles qui tombent en arrière-plan -->
+    <FallingLeaves />
 
-    <!-- Header flottant (back + streak) -->
-    <header class="fixed top-0 left-0 right-0 p-4 z-50">
-      <div class="header-left">
-        <NuxtLink
-          to="/"
-          class="back-btn w-12 h-12 rounded-lg flex items-center justify-center text-white/60 bg-white/5 backdrop-blur-sm transition-all hover:bg-white/15 hover:text-white"
-          aria-label="Retour"
+    <!-- Header flottant (back + streak + bouton jouer) -->
+    <header
+      class="fixed top-0 left-0 right-0 p-4 z-50 flex items-center justify-between"
+    >
+      <NuxtLink
+        to="/"
+        class="back-btn w-12 h-12 rounded-lg flex items-center justify-center text-dark-500/60 bg-dark-500/5 backdrop-blur-sm transition-all hover:bg-dark-500/15 hover:text-dark-500"
+        aria-label="Retour"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="m12 19-7-7 7-7" />
-            <path d="M19 12H5" />
-          </svg>
-        </NuxtLink>
-      </div>
+          <path d="m12 19-7-7 7-7" />
+          <path d="M19 12H5" />
+        </svg>
+      </NuxtLink>
 
       <div
-        class="top-streak absolute left-1/2 top-3 -translate-x-1/2 flex flex-col items-center justify-center z-60 pointer-events-none"
+        class="flex flex-col items-center justify-center"
         aria-hidden="false"
       >
-        <div class="text-2xl font-extrabold text-white drop-shadow-lg">
+        <div class="text-2xl font-extrabold text-dark-500 drop-shadow-sm">
           {{ streak }}
         </div>
-        <div class="text-xs text-white/70 -mt-1">jours</div>
+        <div class="text-xs text-dark-500/60 -mt-1">jours</div>
       </div>
 
-      <div class="header-right" />
+      <NuxtLink
+        v-if="!loading"
+        to="/games/danmen"
+        class="w-12 h-12 flex items-center justify-center bg-green-500/20 text-green-700 rounded-lg transition-all hover:bg-green-500/30"
+        aria-label="Jouer"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M5 3v18l15-9L5 3z" />
+        </svg>
+      </NuxtLink>
+      <div v-else class="w-12 h-12" />
     </header>
 
     <!-- Loader -->
@@ -77,279 +322,348 @@ onMounted(async () => {
       v-if="loading"
       class="loader absolute inset-0 flex items-center justify-center"
     >
-      <div
-        class="w-12 h-12 border-[3px] border-white/10 border-t-green-500 rounded-full animate-spin"
-      />
+      <UiSpinner size="xl" />
     </div>
 
-    <!-- Plante plein écran -->
+    <!-- Carousel de plantes -->
     <div
       v-else
-      class="plant-fullscreen sky-subtle absolute inset-0 flex items-end justify-center pb-0"
+      class="plant-carousel flex-1 flex items-end justify-center pb-8 relative overflow-hidden"
     >
-      <svg
-        viewBox="0 0 400 800"
-        class="plant-svg"
-        xmlns="http://www.w3.org/2000/svg"
-        preserveAspectRatio="xMidYMax meet"
+      <!-- Conteneur des plantes avec transition -->
+      <div
+        class="plants-container flex items-end justify-center transition-transform duration-500 ease-out"
+        :style="{ transform: `translateX(${carouselOffset}px)` }"
       >
-        <defs>
-          <!-- Gradients doux et poétiques -->
-          <linearGradient id="soilGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stop-color="#8b45bc" stop-opacity="0.2" />
-            <stop offset="100%" stop-color="#5e1a7d" stop-opacity="0.4" />
-          </linearGradient>
+        <div
+          v-for="(plant, index) in plants"
+          :key="index"
+          class="plant-item flex-shrink-0 flex items-end justify-center cursor-pointer transition-all duration-500"
+          :class="{
+            'active-plant': index === currentPlantIndex,
+            'inactive-plant': index !== currentPlantIndex,
+            'left-plant': index < currentPlantIndex,
+            'right-plant': index > currentPlantIndex,
+          }"
+          @click="selectPlant(index)"
+        >
+          <svg
+            :viewBox="getViewBoxForStage(plant.stage)"
+            class="plant-svg-item"
+            xmlns="http://www.w3.org/2000/svg"
+            preserveAspectRatio="xMidYMax meet"
+          >
+            <defs>
+              <linearGradient
+                :id="'stemGradient-' + index"
+                x1="0%"
+                y1="100%"
+                x2="0%"
+                y2="0%"
+              >
+                <stop offset="0%" stop-color="#6ec977" />
+                <stop offset="50%" stop-color="#8ed591" />
+                <stop offset="100%" stop-color="#a8e6ae" />
+              </linearGradient>
 
-          <linearGradient id="stemGradient" x1="0%" y1="100%" x2="0%" y2="0%">
-            <stop offset="0%" stop-color="#2f6b3e" />
-            <stop offset="45%" stop-color="#4fb06a" />
-            <stop offset="100%" stop-color="#7de389" />
-          </linearGradient>
+              <linearGradient
+                :id="'leafGradient-' + index"
+                x1="0%"
+                y1="0%"
+                x2="100%"
+                y2="0%"
+              >
+                <stop offset="0%" stop-color="#6ec977" />
+                <stop offset="50%" stop-color="#8ed591" />
+                <stop offset="100%" stop-color="#a8e6ae" />
+              </linearGradient>
 
-          <linearGradient id="leafGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stop-color="#6ec977" />
-            <stop offset="50%" stop-color="#8ed591" />
-            <stop offset="100%" stop-color="#a8e6ae" />
-          </linearGradient>
+              <radialGradient :id="'petalGradient-' + index">
+                <stop offset="0%" stop-color="#f5d0f5" />
+                <stop offset="50%" stop-color="#e8b3e8" />
+                <stop offset="100%" stop-color="#d896d8" />
+              </radialGradient>
 
-          <radialGradient id="petalGradient">
-            <stop offset="0%" stop-color="#f5d0f5" />
-            <stop offset="50%" stop-color="#e8b3e8" />
-            <stop offset="100%" stop-color="#d896d8" />
-          </radialGradient>
+              <radialGradient :id="'centerGradient-' + index">
+                <stop offset="0%" stop-color="#fff9e6" />
+                <stop offset="100%" stop-color="#ffd966" />
+              </radialGradient>
+            </defs>
 
-          <radialGradient id="centerGradient">
-            <stop offset="0%" stop-color="#fff9e6" />
-            <stop offset="100%" stop-color="#ffd966" />
-          </radialGradient>
-        </defs>
+            <!-- Graine simple -->
+            <g v-if="plant.stage === 0" class="seed-group">
+              <ellipse
+                cx="200"
+                cy="720"
+                rx="25"
+                ry="35"
+                fill="#9575cd"
+                opacity="0.8"
+              />
+              <ellipse
+                cx="195"
+                cy="710"
+                rx="8"
+                ry="12"
+                fill="#b39ddb"
+                opacity="0.5"
+              />
+              <path
+                d="M200 690 L200 705"
+                stroke="#a5d6a7"
+                stroke-width="2"
+                stroke-linecap="round"
+                opacity="0.7"
+              />
+            </g>
 
-        <!-- Sol simple et élégant -->
-        <g class="soil">
-          <ellipse
-            cx="200"
-            cy="760"
-            rx="140"
-            ry="20"
-            fill="url(#soilGradient)"
-          />
-          <line
-            x1="80"
-            y1="760"
-            x2="320"
-            y2="760"
-            stroke="#8b45bc"
-            stroke-width="2"
-            opacity="0.3"
-          />
-        </g>
+            <!-- Plante -->
+            <g v-else class="plant-group">
+              <!-- Tige -->
+              <path
+                :d="getStemPathForStage(plant.stage)"
+                fill="none"
+                stroke="#6ec977"
+                stroke-width="22"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="stem"
+              />
 
-        <!-- Graine simple -->
-        <g v-if="stage === 0" class="seed-group">
-          <ellipse
-            cx="200"
-            cy="720"
-            rx="25"
-            ry="35"
-            fill="#9575cd"
-            opacity="0.8"
-          />
-          <ellipse
-            cx="195"
-            cy="710"
-            rx="8"
-            ry="12"
-            fill="#b39ddb"
-            opacity="0.5"
-          />
+              <!-- Feuille 1 -->
+              <g
+                v-if="plant.stage >= 1"
+                class="leaf leaf-1 cursor-pointer"
+                @click.stop="index === currentPlantIndex && onLeafClick(1)"
+              >
+                <path
+                  d="M200 620 Q280 600 320 620 Q300 670 200 620"
+                  :fill="'url(#leafGradient-' + index + ')'"
+                  opacity="0.9"
+                />
+                <path
+                  d="M200 620 L290 635"
+                  stroke="#5fa769"
+                  stroke-width="1.5"
+                  opacity="0.4"
+                />
+              </g>
+
+              <!-- Feuille 2 -->
+              <g
+                v-if="plant.stage >= 2"
+                class="leaf leaf-2 cursor-pointer"
+                @click.stop="index === currentPlantIndex && onLeafClick(2)"
+              >
+                <path
+                  d="M200 540 Q100 510 80 540 Q110 590 200 540"
+                  :fill="'url(#leafGradient-' + index + ')'"
+                  opacity="0.9"
+                />
+                <path
+                  d="M200 540 L110 555"
+                  stroke="#5fa769"
+                  stroke-width="1.5"
+                  opacity="0.4"
+                />
+              </g>
+
+              <!-- Feuille 3 -->
+              <g
+                v-if="plant.stage >= 3"
+                class="leaf leaf-3 cursor-pointer"
+                @click.stop="index === currentPlantIndex && onLeafClick(3)"
+              >
+                <path
+                  d="M200 450 Q300 420 340 450 Q310 510 200 450"
+                  :fill="'url(#leafGradient-' + index + ')'"
+                  opacity="0.9"
+                />
+                <path
+                  d="M200 450 L310 470"
+                  stroke="#5fa769"
+                  stroke-width="1.5"
+                  opacity="0.4"
+                />
+              </g>
+
+              <!-- Feuille 4 -->
+              <g
+                v-if="plant.stage >= 4"
+                class="leaf leaf-4 cursor-pointer"
+                @click.stop="index === currentPlantIndex && onLeafClick(4)"
+              >
+                <path
+                  d="M200 360 Q80 320 60 360 Q100 420 200 360"
+                  :fill="'url(#leafGradient-' + index + ')'"
+                  opacity="0.9"
+                />
+                <path
+                  d="M200 360 L90 380"
+                  stroke="#5fa769"
+                  stroke-width="1.5"
+                  opacity="0.4"
+                />
+              </g>
+
+              <!-- Feuille 5 -->
+              <g
+                v-if="plant.stage >= 5"
+                class="leaf leaf-5 cursor-pointer"
+                @click.stop="index === currentPlantIndex && onLeafClick(5)"
+              >
+                <path
+                  d="M200 270 Q260 255 295 270 Q275 315 200 270"
+                  :fill="'url(#leafGradient-' + index + ')'"
+                  opacity="0.9"
+                />
+              </g>
+
+              <!-- Feuille 6 -->
+              <g v-if="plant.stage >= 5" class="leaf leaf-6">
+                <path
+                  d="M200 220 Q130 200 105 220 Q135 265 200 220"
+                  :fill="'url(#leafGradient-' + index + ')'"
+                  opacity="0.9"
+                />
+              </g>
+
+              <!-- Bourgeon -->
+              <g v-if="plant.stage === 4" class="bud">
+                <ellipse
+                  cx="200"
+                  cy="120"
+                  rx="18"
+                  ry="30"
+                  fill="#d896d8"
+                  opacity="0.7"
+                />
+                <ellipse
+                  cx="200"
+                  cy="110"
+                  rx="12"
+                  ry="20"
+                  fill="#e8b3e8"
+                  opacity="0.5"
+                />
+              </g>
+
+              <!-- Fleur -->
+              <g v-if="plant.stage >= 5" class="flower">
+                <ellipse
+                  cx="200"
+                  cy="70"
+                  rx="35"
+                  ry="50"
+                  :fill="'url(#petalGradient-' + index + ')'"
+                  class="petal"
+                />
+                <ellipse
+                  cx="160"
+                  cy="110"
+                  rx="35"
+                  ry="50"
+                  :fill="'url(#petalGradient-' + index + ')'"
+                  class="petal"
+                  transform="rotate(-72 160 110)"
+                />
+                <ellipse
+                  cx="175"
+                  cy="165"
+                  rx="35"
+                  ry="50"
+                  :fill="'url(#petalGradient-' + index + ')'"
+                  class="petal"
+                  transform="rotate(-144 175 165)"
+                />
+                <ellipse
+                  cx="225"
+                  cy="165"
+                  rx="35"
+                  ry="50"
+                  :fill="'url(#petalGradient-' + index + ')'"
+                  class="petal"
+                  transform="rotate(144 225 165)"
+                />
+                <ellipse
+                  cx="240"
+                  cy="110"
+                  rx="35"
+                  ry="50"
+                  :fill="'url(#petalGradient-' + index + ')'"
+                  class="petal"
+                  transform="rotate(72 240 110)"
+                />
+                <circle
+                  cx="200"
+                  cy="120"
+                  r="22"
+                  :fill="'url(#centerGradient-' + index + ')'"
+                />
+                <circle cx="195" cy="115" r="2" fill="#f4b942" opacity="0.6" />
+                <circle cx="205" cy="115" r="2" fill="#f4b942" opacity="0.6" />
+                <circle cx="200" cy="125" r="2" fill="#f4b942" opacity="0.6" />
+              </g>
+            </g>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Flèche gauche -->
+      <button
+        v-if="plants.length > 1 && currentPlantIndex > 0"
+        @click="previousPlant"
+        class="nav-arrow nav-arrow-left"
+        aria-label="Plante précédente"
+      >
+        <svg
+          class="w-6 h-6"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
           <path
-            d="M200 690 L200 705"
-            stroke="#a5d6a7"
-            stroke-width="2"
-            stroke-linecap="round"
-            opacity="0.7"
-          />
-        </g>
-
-        <!-- Plante -->
-        <g v-else class="plant-group">
-          <!-- Tige centrale simple et élégante (ombre + trait principal pour contraste) -->
-          <path
-            d="M200 740 Q200 500 200 200"
-            fill="none"
-            stroke="#081610"
-            stroke-width="12"
             stroke-linecap="round"
             stroke-linejoin="round"
-            opacity="0.12"
-            class="stem-shadow"
+            stroke-width="2"
+            d="M15 19l-7-7 7-7"
           />
+        </svg>
+      </button>
+
+      <!-- Flèche droite -->
+      <button
+        v-if="plants.length > 1 && currentPlantIndex < plants.length - 1"
+        @click="nextPlant"
+        class="nav-arrow nav-arrow-right"
+        aria-label="Plante suivante"
+      >
+        <svg
+          class="w-6 h-6"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
           <path
-            d="M200 740 Q200 500 200 200"
-            fill="none"
-            stroke="url(#stemGradient)"
-            stroke-width="10"
             stroke-linecap="round"
             stroke-linejoin="round"
-            class="stem"
+            stroke-width="2"
+            d="M9 5l7 7-7 7"
           />
+        </svg>
+      </button>
 
-          <!-- Feuilles plates et stylisées -->
-          <!-- Feuille 1 - bas droite -->
-          <g v-if="stage >= 1" class="leaf leaf-1">
-            <path
-              d="M200 620 Q250 610 280 620 Q270 650 200 620"
-              fill="url(#leafGradient)"
-              opacity="0.9"
-            />
-            <path
-              d="M200 620 L260 625"
-              stroke="#5fa769"
-              stroke-width="1.5"
-              opacity="0.4"
-            />
-          </g>
-
-          <!-- Feuille 2 - bas gauche -->
-          <g v-if="stage >= 2" class="leaf leaf-2">
-            <path
-              d="M200 540 Q150 530 120 540 Q130 570 200 540"
-              fill="url(#leafGradient)"
-              opacity="0.9"
-            />
-            <path
-              d="M200 540 L140 545"
-              stroke="#5fa769"
-              stroke-width="1.5"
-              opacity="0.4"
-            />
-          </g>
-
-          <!-- Feuille 3 - milieu droite -->
-          <g v-if="stage >= 3" class="leaf leaf-3">
-            <path
-              d="M200 450 Q260 435 295 450 Q280 485 200 450"
-              fill="url(#leafGradient)"
-              opacity="0.9"
-            />
-            <path
-              d="M200 450 L270 455"
-              stroke="#5fa769"
-              stroke-width="1.5"
-              opacity="0.4"
-            />
-          </g>
-
-          <!-- Feuille 4 - milieu gauche -->
-          <g v-if="stage >= 4" class="leaf leaf-4">
-            <path
-              d="M200 360 Q140 345 105 360 Q120 395 200 360"
-              fill="url(#leafGradient)"
-              opacity="0.9"
-            />
-            <path
-              d="M200 360 L130 365"
-              stroke="#5fa769"
-              stroke-width="1.5"
-              opacity="0.4"
-            />
-          </g>
-
-          <!-- Feuille 5 - haut droite (petite) -->
-          <g v-if="stage >= 5" class="leaf leaf-5">
-            <path
-              d="M200 270 Q235 265 255 270 Q245 290 200 270"
-              fill="url(#leafGradient)"
-              opacity="0.9"
-            />
-          </g>
-
-          <!-- Feuille 6 - haut gauche (petite) -->
-          <g v-if="stage >= 5" class="leaf leaf-6">
-            <path
-              d="M200 220 Q165 215 145 220 Q155 240 200 220"
-              fill="url(#leafGradient)"
-              opacity="0.9"
-            />
-          </g>
-
-          <!-- Bourgeon simple -->
-          <g v-if="stage === 4" class="bud">
-            <ellipse
-              cx="200"
-              cy="120"
-              rx="18"
-              ry="30"
-              fill="#d896d8"
-              opacity="0.7"
-            />
-            <ellipse
-              cx="200"
-              cy="110"
-              rx="12"
-              ry="20"
-              fill="#e8b3e8"
-              opacity="0.5"
-            />
-          </g>
-
-          <!-- Fleur plate et poétique -->
-          <g v-if="stage >= 5" class="flower">
-            <!-- Pétales (5) -->
-            <ellipse
-              cx="200"
-              cy="70"
-              rx="35"
-              ry="50"
-              fill="url(#petalGradient)"
-              class="petal petal-1"
-            />
-            <ellipse
-              cx="160"
-              cy="110"
-              rx="35"
-              ry="50"
-              fill="url(#petalGradient)"
-              class="petal petal-2"
-              transform="rotate(-72 160 110)"
-            />
-            <ellipse
-              cx="175"
-              cy="165"
-              rx="35"
-              ry="50"
-              fill="url(#petalGradient)"
-              class="petal petal-3"
-              transform="rotate(-144 175 165)"
-            />
-            <ellipse
-              cx="225"
-              cy="165"
-              rx="35"
-              ry="50"
-              fill="url(#petalGradient)"
-              class="petal petal-4"
-              transform="rotate(144 225 165)"
-            />
-            <ellipse
-              cx="240"
-              cy="110"
-              rx="35"
-              ry="50"
-              fill="url(#petalGradient)"
-              class="petal petal-5"
-              transform="rotate(72 240 110)"
-            />
-
-            <!-- Centre de la fleur -->
-            <circle cx="200" cy="120" r="22" fill="url(#centerGradient)" />
-            <!-- Petits points dans le centre -->
-            <circle cx="195" cy="115" r="2" fill="#f4b942" opacity="0.6" />
-            <circle cx="205" cy="115" r="2" fill="#f4b942" opacity="0.6" />
-            <circle cx="200" cy="125" r="2" fill="#f4b942" opacity="0.6" />
-          </g>
-        </g>
-      </svg>
+      <!-- Indicateurs de points -->
+      <div v-if="plants.length > 1" class="dots-indicator">
+        <button
+          v-for="(plant, index) in plants"
+          :key="'dot-' + index"
+          @click="selectPlant(index)"
+          class="dot"
+          :class="{ 'dot-active': index === currentPlantIndex }"
+          :aria-label="'Plante ' + (index + 1)"
+        />
+      </div>
     </div>
 
     <!-- Overlay infos en bas (sans titre stage, streak en haut) -->
@@ -357,58 +671,141 @@ onMounted(async () => {
       v-if="!loading"
       class="info-overlay fixed bottom-0 left-0 right-0 px-4 pt-6 pb-8 text-center z-20"
     >
-      <p class="text-base text-white/70 mb-5">{{ encouragement }}</p>
+      <p class="text-base text-dark-500/70 mb-5">{{ encouragement }}</p>
     </div>
 
-    <!-- Bouton discret fixe sur le côté -->
-    <NuxtLink
-      v-if="!loading"
-      to="/games/danmen"
-      class="fixed right-4 top-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center bg-white/5 text-white/80 rounded-lg shadow-lg transition-all opacity-85 hover:opacity-100 hover:scale-105 z-60"
-      aria-label="Jouer"
-    >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      >
-        <path d="M5 3v18l15-9L5 3z" />
-      </svg>
-    </NuxtLink>
+    <!-- Popup stats feuille -->
+    <Teleport to="body">
+      <Transition name="fade">
+        <div
+          v-if="showStatsPopup"
+          class="fixed inset-0 z-[100] flex items-center justify-center p-4"
+          @click.self="closePopup"
+        >
+          <!-- Backdrop -->
+          <div
+            class="absolute inset-0 bg-dark-500/30 backdrop-blur-sm"
+            @click="closePopup"
+          />
+
+          <!-- Card -->
+          <div
+            class="relative bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full animate-popup"
+          >
+            <button
+              class="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full hover:bg-dark-500/10 transition-colors"
+              @click="closePopup"
+            >
+              <svg
+                class="w-5 h-5 text-dark-500/60"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+
+            <div class="text-center">
+              <div
+                class="w-16 h-16 mx-auto mb-4 rounded-full bg-green-100 flex items-center justify-center"
+              >
+                <svg
+                  class="w-8 h-8 text-green-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"
+                  />
+                </svg>
+              </div>
+
+              <h3 class="text-xl font-semibold text-dark-500 mb-1">
+                Jour {{ selectedLeaf }}
+              </h3>
+              <p class="text-sm text-dark-500/60 mb-6">
+                {{ leafStats?.date ?? "" }}
+              </p>
+
+              <div class="grid grid-cols-2 gap-4">
+                <div class="bg-green-50 rounded-xl p-4">
+                  <div class="text-2xl font-bold text-green-600">
+                    {{ leafStats?.moves ?? "--" }}
+                  </div>
+                  <div class="text-xs text-dark-500/60 mt-1">Coups</div>
+                </div>
+                <div class="bg-amber-50 rounded-xl p-4">
+                  <div class="text-2xl font-bold text-amber-600">
+                    {{ formatTime(leafStats?.timeSpentSeconds ?? null) }}
+                  </div>
+                  <div class="text-xs text-dark-500/60 mt-1">Temps</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
 <style scoped>
-/* Background gradient - aube/crépuscule poétique */
+/* Background gradient - doux et magique */
 .progress-page {
   background: linear-gradient(
     180deg,
-    #1a1435 0%,
-    #2d1b47 20%,
-    #4a2b5c 40%,
-    #3d2952 60%,
-    #2a1a40 80%,
-    #1a1435 100%
+    #e8f5e9 0%,
+    #f1f8e9 15%,
+    #fffde7 35%,
+    #fff8e1 55%,
+    #e8f5e9 75%,
+    #c8e6c9 100%
   );
 }
 
-/* Décor discret - plus naturel qu'un champ d'étoiles */
+/* Décor magique - particules lumineuses subtiles */
 .sky-subtle::before {
   content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(
-    ellipse at center top,
-    rgba(255, 255, 255, 0.02),
-    transparent 30%
-  );
+  background:
+    radial-gradient(
+      circle at 20% 30%,
+      rgba(167, 219, 167, 0.3) 0%,
+      transparent 25%
+    ),
+    radial-gradient(
+      circle at 80% 20%,
+      rgba(255, 236, 179, 0.4) 0%,
+      transparent 20%
+    ),
+    radial-gradient(
+      circle at 60% 70%,
+      rgba(200, 230, 201, 0.3) 0%,
+      transparent 30%
+    );
   pointer-events: none;
+  animation: shimmer 8s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 /* Plante plein écran */
@@ -422,17 +819,19 @@ onMounted(async () => {
   inset: 0;
   background: radial-gradient(
     ellipse at center bottom,
-    rgba(139, 69, 188, 0.15) 0%,
+    rgba(129, 199, 132, 0.2) 0%,
     transparent 60%
   );
   pointer-events: none;
 }
 
 .plant-svg {
-  width: 100%;
-  height: 85vh;
-  max-width: 450px;
-  filter: drop-shadow(0 10px 40px rgba(139, 69, 188, 0.3));
+  width: 90%;
+  height: auto;
+  max-width: 500px;
+  min-height: 50vh;
+  max-height: calc(100vh - 100px);
+  filter: drop-shadow(0 10px 40px rgba(129, 199, 132, 0.2));
   position: relative;
   z-index: 1;
 }
@@ -534,6 +933,18 @@ onMounted(async () => {
   }
 }
 
+/* Hover sur les feuilles cliquables */
+.leaf.cursor-pointer {
+  transition:
+    transform 0.2s ease,
+    filter 0.2s ease;
+}
+
+.leaf.cursor-pointer:hover {
+  transform: scale(1.08);
+  filter: brightness(1.1) drop-shadow(0 4px 8px rgba(110, 201, 119, 0.4));
+}
+
 /* Fleur épanouie */
 .flower {
   opacity: 0;
@@ -627,10 +1038,180 @@ onMounted(async () => {
 .info-overlay {
   background: linear-gradient(
     to top,
-    rgba(26, 20, 53, 0.95) 0%,
-    rgba(26, 20, 53, 0.7) 50%,
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(255, 255, 255, 0.7) 50%,
     transparent 100%
   );
   backdrop-filter: blur(10px);
+}
+
+/* Popup animations */
+.animate-popup {
+  animation: popup-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes popup-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.9) translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Fade transition */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* ===== CAROUSEL DE PLANTES ===== */
+.plant-carousel {
+  position: relative;
+}
+
+.plant-carousel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse at center bottom,
+    rgba(129, 199, 132, 0.2) 0%,
+    transparent 60%
+  );
+  pointer-events: none;
+}
+
+.plants-container {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0;
+  min-height: 50vh;
+}
+
+.plant-item {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+/* Plante active - très grande et au centre */
+.active-plant {
+  z-index: 10;
+  width: 100%;
+  max-width: 600px;
+}
+
+.active-plant .plant-svg-item {
+  width: 100%;
+  max-width: 600px;
+  height: auto;
+  min-height: 65vh;
+  max-height: calc(100vh - 120px);
+  filter: drop-shadow(0 10px 40px rgba(129, 199, 132, 0.3));
+}
+
+/* Plantes inactives - moyennes sur les côtés */
+.inactive-plant {
+  z-index: 5;
+  width: 220px;
+  opacity: 0.6;
+  align-self: flex-end;
+  transform: translateY(-60px);
+}
+
+.inactive-plant .plant-svg-item {
+  width: 200px;
+  max-width: 200px;
+  height: auto;
+  min-height: 50vh;
+  max-height: calc(70vh - 60px);
+  filter: grayscale(30%) drop-shadow(0 5px 20px rgba(129, 199, 132, 0.15));
+}
+
+.inactive-plant:hover {
+  opacity: 0.8;
+  transform: scale(1.1) translateY(-60px);
+}
+
+/* Plantes à gauche */
+.left-plant {
+  margin-right: -40px;
+}
+
+/* Plantes à droite */
+.right-plant {
+  margin-left: -40px;
+}
+
+/* Flèches de navigation */
+.nav-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 30;
+  padding: 12px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.08);
+  color: rgba(0, 0, 0, 0.5);
+  transition: all 0.2s ease;
+  border: none;
+  cursor: pointer;
+}
+
+.nav-arrow:hover {
+  background: rgba(0, 0, 0, 0.15);
+  color: rgba(0, 0, 0, 0.7);
+}
+
+.nav-arrow-left {
+  left: 12px;
+}
+
+.nav-arrow-right {
+  right: 12px;
+}
+
+/* Indicateurs (dots) */
+.dots-indicator {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  z-index: 25;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.2);
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dot:hover {
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.dot-active {
+  background: #6ec977;
+  transform: scale(1.2);
+}
+
+.dot-active:hover {
+  background: #5fa769;
 }
 </style>

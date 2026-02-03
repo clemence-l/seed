@@ -291,12 +291,181 @@ export function useProgress() {
   }
 
   async function getPlantState() {
-    const { streak, lastDay } = await getStreak();
-    return {
-      streak,
-      stage: Math.max(1, streak),
-      lastCompletedDay: lastDay,
+    const user = auth.user.value;
+    if (!user) throw new Error("NOT_AUTHENTICATED");
+
+    // Récupérer tous les jours complétés
+    const playsRes = (await supabase()
+      .from("plays")
+      .select("completed_at")
+      .eq("user_id", user.id)
+      .eq("success", true)
+      .order("completed_at", { ascending: false })
+      .limit(50)) as {
+      data: Array<{ completed_at: string | null }> | null;
+      error: { message: string } | null;
     };
+
+    if (playsRes.error) throw new Error(playsRes.error.message);
+
+    let days: string[] = (playsRes.data ?? [])
+      .map((d) =>
+        d.completed_at
+          ? new Date(d.completed_at).toISOString().slice(0, 10)
+          : null,
+      )
+      .filter((d): d is string => Boolean(d));
+
+    // Dédupliquer les jours (peut y avoir plusieurs plays le même jour)
+    days = [...new Set(days)];
+
+    console.log("[getPlantState] Jours complétés (DESC, dédupliqués):", days);
+
+    if (days.length === 0)
+      return { plants: [], totalStreak: 0, currentPlantIndex: 0 };
+
+    // Grouper les jours en streaks continus
+    const plants: Array<{ stage: number; startDate: string; endDate: string }> =
+      [];
+    let currentGroup: string[] = [days[0]!];
+    let prev = days[0]!;
+
+    for (let i = 1; i < days.length; i++) {
+      const curr = days[i]!;
+      const prevDate = new Date(prev);
+      const currDate = new Date(curr);
+      const diffDays = Math.round(
+        (prevDate.getTime() - currDate.getTime()) / (1000 * 60 * 60 * 24),
+      );
+
+      console.log(
+        `[getPlantState] Comparaison: ${prev} vs ${curr}, diffDays=${diffDays}`,
+      );
+
+      if (diffDays === 1) {
+        // Jour consécutif, ajouter au groupe
+        currentGroup.push(curr);
+        prev = curr;
+      } else if (diffDays === 0) {
+        // Même jour, passer
+        continue;
+      } else {
+        // Trou trouvé, sauvegarder le groupe actuel et commencer un nouveau
+        console.log(
+          `[getPlantState] Trou détecté! Groupe actuel:`,
+          currentGroup,
+        );
+        plants.push({
+          stage: currentGroup.length,
+          startDate: currentGroup[currentGroup.length - 1]!,
+          endDate: currentGroup[0]!,
+        });
+        currentGroup = [curr];
+        prev = curr;
+      }
+    }
+
+    // Ajouter le dernier groupe
+    if (currentGroup.length > 0) {
+      console.log(`[getPlantState] Dernier groupe:`, currentGroup);
+      plants.push({
+        stage: currentGroup.length,
+        startDate: currentGroup[currentGroup.length - 1]!,
+        endDate: currentGroup[0]!,
+      });
+    }
+
+    console.log(`[getPlantState] Plantes avant reverse:`, plants);
+
+    // Inverser pour avoir le plus ancien d'abord
+    plants.reverse();
+
+    console.log(`[getPlantState] Plantes après reverse:`, plants);
+
+    // Calculer la streak totale
+    let totalStreak = 0;
+    let prevDate = days[0]!;
+    totalStreak = 1;
+    for (let i = 1; i < days.length; i++) {
+      const curr = days[i]!;
+      const prevDateObj = new Date(prevDate);
+      const currDateObj = new Date(curr);
+      const diffDays = Math.round(
+        (prevDateObj.getTime() - currDateObj.getTime()) / (1000 * 60 * 60 * 24),
+      );
+      if (diffDays === 1) {
+        totalStreak++;
+        prevDate = curr;
+      } else if (diffDays === 0) {
+        continue;
+      } else break;
+    }
+
+    return {
+      plants,
+      totalStreak,
+      currentPlantIndex: plants.length - 1, // La dernière plante (streak actuelle)
+    };
+  }
+
+  // Récupère les plays détaillés pour une plante donnée (entre startDate et endDate)
+  async function getPlaysForDateRange(
+    startDate: string,
+    endDate: string,
+  ): Promise<
+    Array<{
+      date: string;
+      moves: number | null;
+      timeSpentSeconds: number | null;
+    }>
+  > {
+    const user = auth.user.value;
+    if (!user) return [];
+
+    // On prend du début du startDate à la fin du endDate
+    const startDatetime = `${startDate}T00:00:00.000Z`;
+    const endDatetime = `${endDate}T23:59:59.999Z`;
+
+    const { data, error } = await supabase()
+      .from("plays")
+      .select("completed_at, moves, time_spent_seconds")
+      .eq("user_id", user.id)
+      .eq("success", true)
+      .gte("completed_at", startDatetime)
+      .lte("completed_at", endDatetime)
+      .order("completed_at", { ascending: true });
+
+    if (error) {
+      console.error("[getPlaysForDateRange] error:", error);
+      return [];
+    }
+
+    // Grouper par jour et prendre le meilleur play de chaque jour (moins de coups)
+    const byDay = new Map<
+      string,
+      { date: string; moves: number | null; timeSpentSeconds: number | null }
+    >();
+
+    for (const play of data ?? []) {
+      if (!play.completed_at) continue;
+      const day = new Date(play.completed_at).toISOString().slice(0, 10);
+
+      const existing = byDay.get(day);
+      // Garder celui avec le moins de coups, ou le premier si pas de moves
+      if (
+        !existing ||
+        (play.moves !== null &&
+          (existing.moves === null || play.moves < existing.moves))
+      ) {
+        byDay.set(day, {
+          date: day,
+          moves: play.moves,
+          timeSpentSeconds: play.time_spent_seconds,
+        });
+      }
+    }
+
+    return Array.from(byDay.values());
   }
 
   return {
@@ -306,6 +475,7 @@ export function useProgress() {
     completePlay,
     getStreak,
     getPlantState,
+    getPlaysForDateRange,
   };
 }
 

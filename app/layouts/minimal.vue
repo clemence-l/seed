@@ -13,7 +13,7 @@ const title = computed(() => {
 });
 
 function goBack() {
-  router.back();
+  router.push("/");
 }
 
 function openRules() {
@@ -26,7 +26,9 @@ function openRules() {
 
 <template>
   <div class="min-h-dvh bg-light-500 flex items-start justify-center">
-    <div class="w-full max-w-120 mx-auto min-h-dvh shadow-[0_0_40px_rgba(0,0,0,0.05)]">
+    <div
+      class="w-full max-w-120 mx-auto min-h-dvh shadow-[0_0_40px_rgba(0,0,0,0.05)]"
+    >
       <!-- Header placé ici -->
       <header
         class="flex items-center px-3 py-3 border-b border-dark-500/10 bg-light-500"

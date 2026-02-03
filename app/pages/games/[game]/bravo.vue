@@ -172,7 +172,7 @@ function toggleSolution() {
       v-if="loading"
       class="flex flex-col items-center justify-center w-full"
     >
-      <div class="text-dark-500/60">Chargement...</div>
+      <UiSpinner size="xl" />
     </div>
 
     <!-- Pas de données -->

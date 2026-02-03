@@ -325,7 +325,7 @@ async function handleComplete(): Promise<void> {
         moves: movesCount,
         success: true,
       });
-    } catch (e) {
+    } catch {
       // Erreur lors de la sauvegarde du play (silent)
     }
   }
