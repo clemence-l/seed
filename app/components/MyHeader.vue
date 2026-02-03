@@ -18,7 +18,7 @@ const label = computed(() => {
 
 <template>
   <header
-    class="hidden md:block fixed w-screen top-0 z-50 bg-light-500 border-b border-dark-500/10 py-4 px-8"
+    class="fixed w-screen top-0 z-50 bg-light-500 border-b border-dark-500/10 py-4 px-8"
   >
     <div class="flex items-center justify-between">
       <NuxtLink to="/" class="hover:scale-90 transition-transform ease-in">
