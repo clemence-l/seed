@@ -86,8 +86,8 @@ function createFallingElement(
     size: isSnow ? 6 + Math.random() * 14 : 12 + Math.random() * 18,
     rotation: Math.random() * 360,
     rotationSpeed: (Math.random() - 0.5) * 2,
-    speedX: burst ? (Math.random() - 0.5) * 5 : (Math.random() - 0.5) * 0.8,
-    speedY: burst ? Math.random() * 1.5 + 0.5 : 0.3 + Math.random() * 0.6,
+    speedX: burst ? (Math.random() - 0.5) * 3 : (Math.random() - 0.5) * 0.5,
+    speedY: burst ? Math.random() * 2 + 1 : 0.5 + Math.random() * 0.8,
     opacity: isSnow ? 0.7 + Math.random() * 0.3 : 0.5 + Math.random() * 0.3,
     color: COLORS[Math.floor(Math.random() * COLORS.length)],
     swayPhase: Math.random() * Math.PI * 2,
@@ -103,7 +103,7 @@ function initElements() {
   if (!canvas) return;
 
   const initialElements: FallingElement[] = [];
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < 8; i++) {
     const element = createFallingElement();
     element.y = Math.random() * canvas.height;
     initialElements.push(element);
@@ -385,19 +385,17 @@ function updateElements() {
       );
     });
 
-  // Ajouter de nouveaux éléments en continu
-  const targetCount = 25;
-  const spawnRate = 0.06;
+  // Ajouter de nouveaux éléments en continu (moins pour la fluidité)
+  const targetCount = 15;
+  const spawnRate = 0.08;
 
   if (elements.value.length < targetCount && Math.random() < spawnRate) {
     elements.value.push(createFallingElement());
   }
 
-  // Spawn multiple si vraiment peu d'éléments
-  if (elements.value.length < 50) {
-    for (let i = 0; i < 3; i++) {
-      elements.value.push(createFallingElement());
-    }
+  // S'assurer qu'il y a toujours quelques éléments
+  if (elements.value.length < 5) {
+    elements.value.push(createFallingElement());
   }
 }
 
@@ -424,13 +422,13 @@ function handleResize() {
 }
 
 function handleClick(e: MouseEvent) {
-  const burstCount = 12 + Math.floor(Math.random() * 10);
+  const burstCount = 5 + Math.floor(Math.random() * 4);
   for (let i = 0; i < burstCount; i++) {
     const element = createFallingElement(e.clientX, e.clientY, true);
     const angle = (i / burstCount) * Math.PI * 2 + Math.random() * 0.5;
-    const speed = 2 + Math.random() * 4;
-    element.speedX = Math.cos(angle) * speed;
-    element.speedY = Math.sin(angle) * speed + 0.5;
+    const speed = 1.5 + Math.random() * 2.5;
+    element.speedX = Math.cos(angle) * speed * 0.6;
+    element.speedY = Math.sin(angle) * speed + 1;
     elements.value.push(element);
   }
 }
