@@ -13,13 +13,14 @@ useHead({ title: "Seed | Connexion..." });
 const router = useRouter();
 const route = useRoute();
 const auth = useAuth();
+const { $supabase } = useNuxtApp();
 
 const error = ref<string | null>(null);
 const loading = ref(true);
 
 onMounted(async () => {
   try {
-    // Vérifier s'il y a une erreur dans l'URL
+    // Vérifier s'il y a une erreur dans l'URL (query params)
     if (route.query.error) {
       error.value =
         (route.query.error_description as string) ||
@@ -28,23 +29,47 @@ onMounted(async () => {
       return;
     }
 
-    // Attendre que Supabase détecte et établisse la session
-    // Le plugin Supabase a detectSessionInUrl: true donc il gère automatiquement
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    // Vérifier aussi l'erreur dans le hash fragment
+    const hash = window.location.hash;
+    if (hash.includes("error=")) {
+      const params = new URLSearchParams(hash.substring(1));
+      error.value =
+        params.get("error_description") || "Erreur d'authentification";
+      loading.value = false;
+      return;
+    }
 
-    // Recharger la session pour s'assurer qu'elle est à jour
-    await auth.fetchSession();
+    // Si le hash contient access_token, Supabase doit le traiter
+    // On appelle getSession() qui va automatiquement parser le hash
+    const { data, error: sessionError } = await $supabase.auth.getSession();
 
-    if (auth.isLoggedIn.value) {
+    if (sessionError) {
+      error.value = sessionError.message;
+      loading.value = false;
+      return;
+    }
+
+    if (data.session) {
+      // Session établie, mettre à jour l'état auth
+      await auth.fetchSession();
       // Succès : rediriger vers le profil ou la page demandée
       const redirect = (route.query.redirect as string) || "/profile";
       await router.push(redirect);
     } else {
-      error.value = "La session n'a pas pu être établie. Veuillez réessayer.";
-      loading.value = false;
+      // Pas de session immédiate, attendre un peu et réessayer
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const { data: retryData } = await $supabase.auth.getSession();
+
+      if (retryData.session) {
+        await auth.fetchSession();
+        const redirect = (route.query.redirect as string) || "/profile";
+        await router.push(redirect);
+      } else {
+        error.value = "La session n'a pas pu être établie. Veuillez réessayer.";
+        loading.value = false;
+      }
     }
   } catch (e) {
-    console.error("[Callback] Error:", e);
     error.value =
       e instanceof Error ? e.message : "Erreur lors de l'authentification";
     loading.value = false;
