@@ -246,10 +246,10 @@ function goProfile() {
 
       <!-- Solution animée en encadré -->
       <div v-if="gridSize > 0" class="mb-8">
-        <div class="bg-dark-500/5 border border-dark-500/10 rounded-2xl p-4">
+        <div class="bg-dark-500/5 border border-dark-500/10 p-4">
           <p class="text-center text-sm text-dark-500/60 mb-3">Solution</p>
           <div
-            class="bg-dark-500 rounded-xl p-0.5 mx-auto"
+            class="bg-dark-500 p-0.5 mx-auto"
             :style="{ width: gridSize >= 5 ? '200px' : '160px' }"
           >
             <div
@@ -271,15 +271,15 @@ function goProfile() {
                       : animatedGrid[r - 1]?.[c - 1] === 'empty'
                         ? 'bg-lavender-500'
                         : 'bg-lavender-500/50',
-                    r === 1 && c === 1 ? 'rounded-tl-lg' : '',
-                    r === 1 && c === gridSize ? 'rounded-tr-lg' : '',
-                    r === gridSize && c === 1 ? 'rounded-bl-lg' : '',
-                    r === gridSize && c === gridSize ? 'rounded-br-lg' : '',
+                    r === 1 && c === 1 ? '' : '',
+                    r === 1 && c === gridSize ? '' : '',
+                    r === gridSize && c === 1 ? '' : '',
+                    r === gridSize && c === gridSize ? '' : '',
                   ]"
                 >
                   <span
                     v-if="animatedGrid[r - 1]?.[c - 1] === 'filled'"
-                    class="w-2/5 h-2/5 rounded-full bg-light-500 animate-in zoom-in duration-200"
+                    class="w-2/5 h-2/5 bg-light-500 animate-in zoom-in duration-200"
                   />
                   <svg
                     v-else-if="animatedGrid[r - 1]?.[c - 1] === 'empty'"

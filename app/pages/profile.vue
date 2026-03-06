@@ -1,12 +1,7 @@
 <script setup lang="ts">
-/**
- * Page Profil - Version refactorisée
- */
-import ProfileCard from "../components/profile/ProfileCard.vue";
-import ProfileAccountInfo from "../components/profile/ProfileAccountInfo.vue";
 import UiAlert from "../components/ui/Alert.vue";
-import UiSpinner from "../components/ui/Spinner.vue";
-import UiButton from "../components/UiButton.vue";
+
+definePageMeta({ layout: "mobile" });
 
 const router = useRouter();
 const auth = useAuth();
@@ -16,10 +11,8 @@ const messages = useMessages();
 const avatarInput = ref<HTMLInputElement | null>(null);
 const uploadingAvatar = ref(false);
 const streak = ref(0);
-const streakCount = ref(0);
-const loading = ref(true);
+const streakCount = ref(0); // nombre de victoires
 const localDisplayName = ref<string | null>(null);
-const pendingEmail = ref<string | null>(null);
 
 const displayName = computed(
   () => localDisplayName.value || auth.displayName.value || "Joueur",
@@ -36,24 +29,23 @@ onMounted(async () => {
     return;
   }
   try {
-    const plantState = await progress.getPlantState();
-    streak.value = plantState.totalStreak ?? 0;
-    streakCount.value = plantState.plants.length;
+    // Paralléliser toutes les requêtes
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const startDate = thirtyDaysAgo.toISOString().slice(0, 10);
+    const endDate = new Date().toISOString().slice(0, 10);
+
+    const [streakData, plays] = await Promise.all([
+      progress.getStreak(),
+      progress.getPlaysForDateRange(startDate, endDate),
+    ]);
+
+    streak.value = streakData.streak;
+    streakCount.value = plays.length;
   } catch (e) {
     console.error("Erreur chargement stats:", e);
-  } finally {
-    loading.value = false;
   }
 });
-
-async function handleLogout() {
-  try {
-    await auth.signOut();
-    await router.push("/");
-  } catch (e) {
-    console.error("[profile] handleLogout error", e);
-  }
-}
 
 function triggerAvatarUpload() {
   avatarInput.value?.click();
@@ -82,45 +74,15 @@ async function handleAvatarChange(event: Event) {
   }
   target.value = "";
 }
-
-async function handleSaveEmail(newEmail: string) {
-  messages.clearAll();
-  pendingEmail.value = newEmail;
-  const result = await auth.updateEmail(newEmail);
-  if (!result.success) {
-    pendingEmail.value = null;
-    messages.setError(result.error ?? "Erreur de mise à jour");
-  }
-}
-
-async function handleSaveUsername(newUsername: string) {
-  messages.clearAll();
-  localDisplayName.value = newUsername;
-  const result = await auth.updateDisplayName(newUsername);
-  if (result.success) {
-    messages.setSuccess("Pseudo mis à jour");
-  } else {
-    localDisplayName.value = null;
-    messages.setError(result.error ?? "Erreur de mise à jour");
-  }
-}
-
-async function handleSavePassword(password: string) {
-  messages.clearAll();
-  const result = await auth.updatePassword(password);
-  if (result.success) {
-    messages.setSuccess("Mot de passe mis à jour");
-  } else {
-    messages.setError(result.error ?? "Erreur de mise à jour");
-  }
-}
 </script>
 
 <template>
-  <main
-    class="min-h-dvh bg-light-500 text-dark-500 px-4 py-8 pt-16 md:px-8 rounded-b-3xl flex items-center"
-  >
-    <div class="max-w-5xl mx-auto w-full">
+  <main class="min-h-dvh bg-white text-gray-900 pb-20">
+    <!-- Header -->
+    <AppHeader mode="profile" :display-name="displayName" />
+
+    <!-- Content -->
+    <div class="pt-16 px-5 py-6">
       <UiAlert
         v-if="messages.success.value"
         type="success"
@@ -133,63 +95,87 @@ async function handleSavePassword(password: string) {
         v-if="messages.error.value"
         type="error"
         dismissible
-        class="mb-4"
+        class="mb-6"
       >
         {{ messages.error.value }}
       </UiAlert>
 
-      <div v-if="loading" class="flex items-center justify-center py-20">
-        <UiSpinner size="lg" />
-      </div>
+      <template v-if="auth.user.value">
+        <!-- Profile Photo Section -->
+        <div class="flex flex-col items-center mb-8">
+          <div class="relative mb-4">
+            <NuxtImg
+              v-if="auth.profile.value?.avatar_url"
+              :src="auth.profile.value.avatar_url"
+              :alt="displayName"
+              class="w-24 h-24 rounded-full object-cover"
+            />
+            <NuxtImg
+              v-else
+              src="/img/profile.svg"
+              :alt="displayName"
+              class="w-24 h-24 rounded-full object-cover"
+            />
+            <button
+              :disabled="uploadingAvatar"
+              class="absolute bottom-0 right-0 bg-gray-900 text-white w-7 h-7 rounded-full flex items-center justify-center hover:bg-gray-800 transition-colors disabled:opacity-50"
+              title="Modifier la photo"
+              @click="triggerAvatarUpload"
+            >
+              ✏
+            </button>
+          </div>
+          <input
+            ref="avatarInput"
+            type="file"
+            accept="image/*"
+            class="hidden"
+            @change="handleAvatarChange"
+          />
+          <p class="text-sm text-gray-500 text-center">
+            {{ displayName }}, découvre tes statistiques !
+          </p>
+        </div>
 
-      <template v-else-if="auth.user.value">
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <div class="lg:col-span-4">
-            <ProfileCard
-              :display-name="displayName"
-              :avatar-url="auth.profile.value?.avatar_url"
-              :streak="streak"
-              :streak-count="streakCount"
-              :is-uploading="uploadingAvatar"
-              @upload-avatar="triggerAvatarUpload"
-            />
-            <input
-              ref="avatarInput"
-              type="file"
-              accept="image/*"
-              class="hidden"
-              @change="handleAvatarChange"
-            />
+        <!-- Game Stats Cards -->
+        <div class="space-y-4">
+          <div
+            v-if="streakCount > 0 || streak > 0"
+            class="bg-gray-50 p-4 rounded-lg"
+          >
+            <div class="flex items-start justify-between mb-3">
+              <h3 class="font-bold text-lg">Danmen</h3>
+              <NuxtImg
+                src="/img/danmen.svg"
+                alt="Danmen"
+                class="w-8 h-8 object-contain"
+              />
+            </div>
+            <div class="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <p class="text-gray-500">Victoires</p>
+                <p class="font-bold text-lg">{{ streakCount }}</p>
+              </div>
+              <div>
+                <p class="text-gray-500">Streak</p>
+                <p class="font-bold text-lg">{{ streak }}</p>
+              </div>
+              <div class="col-span-2 pt-2 border-t border-gray-200">
+                <p class="text-gray-500">Meilleur temps</p>
+                <p class="font-bold">--:--</p>
+              </div>
+            </div>
           </div>
 
-          <div class="lg:col-span-8 space-y-6">
-            <ProfileAccountInfo
-              :email="auth.user.value?.email ?? ''"
-              :display-name="displayName"
-              :role="auth.profile.value?.role"
-              :created-at="auth.profile.value?.created_at"
-              :pending-email="pendingEmail"
-              @save-email="handleSaveEmail"
-              @save-username="handleSaveUsername"
-              @save-password="handleSavePassword"
-            />
-
-            <div class="flex flex-col sm:flex-row gap-4">
-              <NuxtLink
-                to="/"
-                class="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-light-500 border border-dark-500/20 text-dark-500 font-semibold hover:bg-dark-500/5 transition-colors"
-              >
-                Retour accueil
-              </NuxtLink>
-              <UiButton
-                variant="danger"
-                size="lg"
-                class="flex-1"
-                @click="handleLogout"
-              >
-                Déconnexion
-              </UiButton>
-            </div>
+          <!-- Empty State -->
+          <div v-else class="text-center py-8 text-gray-400">
+            <p class="mb-2">Aucun jeu encore joué</p>
+            <NuxtLink
+              to="/games/danmen"
+              class="text-purple-500 hover:underline"
+            >
+              Commence par jouer à Danmen →
+            </NuxtLink>
           </div>
         </div>
       </template>

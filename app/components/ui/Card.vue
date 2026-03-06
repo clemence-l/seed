@@ -20,7 +20,7 @@ const paddingClasses: Record<string, string> = {
 
 <template>
   <div
-    class="rounded-2xl border border-dark-500/10 bg-white shadow-sm"
+    class="rounded-xl border border-dark-500/10 bg-white shadow-sm"
     :class="paddingClasses[padding || 'md']"
   >
     <div v-if="title || $slots.header" class="mb-4">

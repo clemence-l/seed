@@ -21,19 +21,19 @@ const type = computed(() => props.type ?? "button");
 const variantClasses = computed(() => {
   switch (variant.value) {
     case "primary":
-      return "bg-dark-500 text-light-500 hover:bg-dark-500/90";
+      return "bg-pink-500 text-white hover:bg-pink-500/90 font-semibold shadow-sm";
     case "secondary":
-      return "bg-light-500 text-dark-500 border border-dark-500/20 hover:bg-dark-500/5";
+      return "bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200";
     case "success":
-      return "bg-green-500 text-white hover:bg-green-600";
+      return "bg-lime-500 text-white hover:bg-lime-500/90 font-semibold shadow-sm";
     case "danger":
-      return "bg-red-500 text-white hover:bg-red-600";
+      return "bg-red-500 text-white hover:bg-red-500/90 font-semibold shadow-sm";
     case "ghost":
-      return "bg-transparent text-dark-500/70 hover:bg-dark-500/5 hover:text-dark-500";
+      return "bg-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-900";
     case "outline":
-      return "bg-transparent text-dark-500 border border-dark-500 hover:bg-dark-500 hover:text-light-500";
+      return "bg-transparent text-gray-700 border border-gray-300 hover:bg-gray-50";
     default:
-      return "bg-dark-500 text-light-500 hover:bg-dark-500/90";
+      return "bg-pink-500 text-white hover:bg-pink-500/90 font-semibold shadow-sm";
   }
 });
 

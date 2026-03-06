@@ -95,12 +95,12 @@ function cancelPassword() {
 </script>
 
 <template>
-  <div class="rounded-2xl border border-dark-500/10 bg-white p-6 shadow-sm">
+  <div class=" border border-dark-500/10 bg-white p-6 shadow-sm">
     <div class="flex items-center justify-between mb-6">
       <h3 class="text-lg font-semibold text-dark-500">
         Informations du compte
       </h3>
-      <div class="w-2 h-2 rounded-full bg-green-500" title="Connecté" />
+      <div class="w-2 h-2 bg-green-500" title="Connecté" />
     </div>
 
     <div class="space-y-6">
@@ -114,21 +114,21 @@ function cancelPassword() {
             <input
               v-model="newEmail"
               type="email"
-              class="flex-1 rounded-lg border border-dark-500/20 bg-light-500 px-3 py-2 text-dark-500 outline-none focus:border-dark-500 focus:ring-1 focus:ring-dark-500"
+              class="flex-1 border border-dark-500/20 bg-light-500 px-3 py-2 text-dark-500 outline-none focus:border-dark-500 focus:ring-1 focus:ring-dark-500"
               placeholder="nouveau@email.com"
               @keyup.enter="saveEmail"
               @keyup.escape="cancelEmail"
             >
             <button
               type="button"
-              class="w-8 h-8 rounded-lg bg-green-100 text-green-600 hover:bg-green-200 flex items-center justify-center transition-colors cursor-pointer"
+              class="w-8 h-8 bg-green-100 text-green-600 hover:bg-green-200 flex items-center justify-center transition-colors cursor-pointer"
               @click="saveEmail"
             >
               <UiIcon name="check" class="w-4 h-4" />
             </button>
             <button
               type="button"
-              class="w-8 h-8 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 flex items-center justify-center transition-colors cursor-pointer"
+              class="w-8 h-8 bg-red-100 text-red-600 hover:bg-red-200 flex items-center justify-center transition-colors cursor-pointer"
               @click="cancelEmail"
             >
               <UiIcon name="close" class="w-4 h-4" />
@@ -165,21 +165,21 @@ function cancelPassword() {
             <input
               v-model="newUsername"
               type="text"
-              class="flex-1 rounded-lg border border-dark-500/20 bg-light-500 px-3 py-2 text-dark-500 outline-none focus:border-dark-500 focus:ring-1 focus:ring-dark-500"
+              class="flex-1 border border-dark-500/20 bg-light-500 px-3 py-2 text-dark-500 outline-none focus:border-dark-500 focus:ring-1 focus:ring-dark-500"
               placeholder="TonPseudo"
               @keyup.enter="saveUsername"
               @keyup.escape="cancelUsername"
             >
             <button
               type="button"
-              class="w-8 h-8 rounded-lg bg-green-100 text-green-600 hover:bg-green-200 flex items-center justify-center transition-colors cursor-pointer"
+              class="w-8 h-8 bg-green-100 text-green-600 hover:bg-green-200 flex items-center justify-center transition-colors cursor-pointer"
               @click="saveUsername"
             >
               <UiIcon name="check" class="w-4 h-4" />
             </button>
             <button
               type="button"
-              class="w-8 h-8 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 flex items-center justify-center transition-colors cursor-pointer"
+              class="w-8 h-8 bg-red-100 text-red-600 hover:bg-red-200 flex items-center justify-center transition-colors cursor-pointer"
               @click="cancelUsername"
             >
               <UiIcon name="close" class="w-4 h-4" />
@@ -210,13 +210,13 @@ function cancelPassword() {
             <input
               v-model="newPassword"
               type="password"
-              class="w-full rounded-lg border border-dark-500/20 bg-light-500 px-3 py-2 text-dark-500 outline-none focus:border-dark-500 focus:ring-1 focus:ring-dark-500"
+              class="w-full border border-dark-500/20 bg-light-500 px-3 py-2 text-dark-500 outline-none focus:border-dark-500 focus:ring-1 focus:ring-dark-500"
               placeholder="Nouveau mot de passe"
             >
             <input
               v-model="confirmPassword"
               type="password"
-              class="w-full rounded-lg border border-dark-500/20 bg-light-500 px-3 py-2 text-dark-500 outline-none focus:border-dark-500 focus:ring-1 focus:ring-dark-500"
+              class="w-full border border-dark-500/20 bg-light-500 px-3 py-2 text-dark-500 outline-none focus:border-dark-500 focus:ring-1 focus:ring-dark-500"
               placeholder="Confirmer le mot de passe"
               @keyup.enter="savePassword"
             >
@@ -262,7 +262,7 @@ function cancelPassword() {
             Statut
           </p>
           <span
-            class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-dark-500/5 text-dark-500 text-sm font-medium"
+            class="inline-flex items-center gap-1.5 px-3 py-1 bg-dark-500/5 text-dark-500 text-sm font-medium"
           >
             <UiIcon name="star" class="w-3 h-3" />
             {{ role === "admin" ? "Administrateur" : "Joueur" }}

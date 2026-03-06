@@ -51,7 +51,7 @@ function onInput(event: Event) {
         'border-red-500 focus:border-red-500 focus:ring-red-500': error,
       }"
       @input="onInput"
-    >
+    />
     <p v-if="error" class="mt-1 text-xs text-red-500">{{ error }}</p>
   </div>
 </template>

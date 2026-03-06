@@ -1,23 +1,29 @@
 @import url("https://fonts.googleapis.com/css2?family=Lily+Script+One&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap");
-
+@import url("https://fonts.googleapis.com/css2?family=Tilt+Warp&display=swap");
 @import "tailwindcss";
 
 @theme {
-  --color-purple-500: oklch(0.6527 0.2083 301.33);
-  --color-indigo-500: oklch(0.5008 0.2578 279.89);
-  --color-lavender-500: oklch(0.9162 0.026 278.72);
-  --color-dark-500: #131313;
-  --color-dark-200: #1f1f1f;
-  --color-light-500: #fefefe;
-  --color-green-500: oklch(0.6 0.2 145);
+  --color-pink-500: #fd00b8;
+  --color-lime-500: #aaff00;
+  --color-purple-500: #5533ef;
+  --color-dark-500: #0D0D0D;
+  --color-light-500: #fdfefe;
+
+  /* Legacy aliases for compatibility */
+  --color-indigo-500: #5533ef;
+  --color-lavender-500: #fdfefe;
+  --color-dark-200: #1a1318;
+  --color-green-500: #aaff00;
 
   --font-poppins: "Poppins", sans-serif;
   --font-lily: "Lily Script One", cursive;
+  --font-tilt: "Tilt Warp", cursive;
 }
 
 body {
   font-family: var(--font-poppins);
-  color: var(--color-dark-500);
+  color: #1a1a2e;
+  background-color: #ffffff;
 }
 
 @keyframes sway {
@@ -47,20 +53,47 @@ body {
   }
 }
 
-@keyframes seed-fall {
+@keyframes fall {
   0% {
-    opacity: 0;
-    transform: translateY(-100px) rotate(0deg);
-  }
-  10% {
     opacity: 0.3;
-  }
-  90% {
-    opacity: 0.3;
+    transform: translateY(-100vh) rotate(0deg);
   }
   100% {
-    opacity: 0;
+    opacity: 0.3;
     transform: translateY(100vh) rotate(360deg);
+  }
+}
+
+@keyframes fallAndBounce {
+  0% {
+    transform: translateY(-100vh) rotate(0deg);
+    opacity: 0;
+  }
+  5% {
+    opacity: 0.5;
+  }
+  85% {
+    opacity: 0.5;
+  }
+  90% {
+    transform: translateY(calc(100vh - 180px)) rotate(360deg);
+    opacity: 0.4;
+  }
+  92% {
+    transform: translateY(calc(100vh - 200px)) rotate(361deg);
+    opacity: 0.4;
+  }
+  94% {
+    transform: translateY(calc(100vh - 180px)) rotate(362deg);
+    opacity: 0.4;
+  }
+  96% {
+    transform: translateY(calc(100vh - 190px)) rotate(363deg);
+    opacity: 0.4;
+  }
+  100% {
+    transform: translateY(calc(100vh - 185px)) rotate(364deg);
+    opacity: 0.4;
   }
 }
 
@@ -68,8 +101,12 @@ body {
   animation: float 8s ease-in-out infinite;
 }
 
-.animate-seed-fall {
-  animation: seed-fall 12s linear infinite;
+.animate-fall {
+  animation: fall 15s linear infinite;
+}
+
+.animate-fall-bounce {
+  animation: fallAndBounce linear infinite;
 }
 
 .animation-delay-200 {

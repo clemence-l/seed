@@ -1,52 +1,93 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useProgress } from "~/composables/useProgress";
+import { useFriends, type FriendProfile } from "~/composables/useFriends";
 
-definePageMeta({
-  layout: "minimal2",
+definePageMeta({ layout: "mobile" });
+
+useHead({ title: "Aínigma | Progression" });
+
+const auth = useAuth();
+const progress = useProgress();
+const friendsComposable = useFriends();
+
+// Stats personnelles
+const streak = ref(0);
+const totalWins = ref(0);
+const bestTime = ref<number | null>(null);
+const avgMoves = ref<number | null>(null);
+const recentDays = ref<
+  Array<{
+    date: string;
+    success: boolean;
+    moves: number | null;
+    timeSpentSeconds: number | null;
+  }>
+>([]);
+
+// Calendrier (30 derniers jours)
+const last30Days = computed(() => {
+  const days: Array<{ date: string; label: string; played: boolean }> = [];
+  const today = new Date();
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().slice(0, 10);
+    const played = recentDays.value.some(
+      (r) => r.date === dateStr && r.success,
+    );
+    days.push({
+      date: dateStr,
+      label: d.getDate().toString(),
+      played,
+    });
+  }
+  return days;
 });
 
-const loading = ref(true);
-const stage = ref(0);
-const streak = ref(0);
-const encouragement = ref("");
-
-// Multiple plants
-const plants = ref<
-  Array<{ stage: number; startDate: string; endDate: string }>
+// Amis
+const friendsList = ref<FriendProfile[]>([]);
+const showAddFriend = ref(false);
+const searchQuery = ref("");
+const searchResults = ref<
+  Array<{ id: string; username: string; avatar_url: string | null }>
 >([]);
-const currentPlantIndex = ref(0);
+const searching = ref(false);
 
-// Popup stats
-const showStatsPopup = ref(false);
-const selectedLeaf = ref<number | null>(null);
-const leafStats = ref<{
-  date: string;
-  moves: number | null;
-  timeSpentSeconds: number | null;
-} | null>(null);
+// Recherche d'amis
+let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+function onSearchInput() {
+  if (searchTimeout) clearTimeout(searchTimeout);
+  if (searchQuery.value.length < 2) {
+    searchResults.value = [];
+    return;
+  }
+  searching.value = true;
+  searchTimeout = setTimeout(async () => {
+    searchResults.value = await friendsComposable.searchUsers(
+      searchQuery.value,
+    );
+    searching.value = false;
+  }, 400);
+}
 
-// Ref pour scroll
-const plantContainer = ref<HTMLElement | null>(null);
+async function addFriend(userId: string) {
+  friendsComposable.addFriend(userId);
+  searchQuery.value = "";
+  searchResults.value = [];
+  showAddFriend.value = false;
+  await loadFriends();
+}
 
-const progress = useProgress();
+async function removeFriendHandler(userId: string) {
+  friendsComposable.removeFriend(userId);
+  await loadFriends();
+}
 
-// Plant actuelle
-const currentPlant = computed(() => plants.value[currentPlantIndex.value]);
+async function loadFriends() {
+  friendsList.value = await friendsComposable.getFriendsWithStats();
+}
 
-// Stats des plays par plante (indexé par plantIndex, puis par feuille 1-5)
-const plantsPlayData = ref<
-  Map<
-    number,
-    Array<{
-      date: string;
-      moves: number | null;
-      timeSpentSeconds: number | null;
-    }>
-  >
->(new Map());
-
-// Formatter le temps en minutes:secondes
 function formatTime(seconds: number | null): string {
   if (seconds === null || seconds === undefined) return "--:--";
   const mins = Math.floor(seconds / 60);
@@ -54,1258 +95,442 @@ function formatTime(seconds: number | null): string {
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
-// Formatter la date en français
 function formatDate(dateStr: string): string {
-  const date = new Date(dateStr);
-  return date.toLocaleDateString("fr-FR", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-}
-
-async function onLeafClick(leafNum: number) {
-  const plantIdx = currentPlantIndex.value;
-  const plant = plants.value[plantIdx];
-  if (!plant) return;
-
-  // Charger les données si pas encore en cache
-  if (!plantsPlayData.value.has(plantIdx)) {
-    const plays = await progress.getPlaysForDateRange(
-      plant.startDate,
-      plant.endDate,
-    );
-    plantsPlayData.value.set(plantIdx, plays);
-  }
-
-  const plays = plantsPlayData.value.get(plantIdx) ?? [];
-  // La feuille N correspond au Nème jour (index N-1)
-  const playData = plays[leafNum - 1];
-
-  selectedLeaf.value = leafNum;
-  if (playData) {
-    leafStats.value = {
-      date: formatDate(playData.date),
-      moves: playData.moves,
-      timeSpentSeconds: playData.timeSpentSeconds,
-    };
-  } else {
-    leafStats.value = null;
-  }
-  showStatsPopup.value = true;
-}
-
-function closePopup() {
-  showStatsPopup.value = false;
-  selectedLeaf.value = null;
-}
-
-// Navigation entre plantes
-function previousPlant() {
-  if (currentPlantIndex.value > 0) {
-    currentPlantIndex.value--;
-    stage.value = currentPlant.value.stage;
-    updateEncouragement();
-  }
-}
-
-function nextPlant() {
-  if (currentPlantIndex.value < plants.value.length - 1) {
-    currentPlantIndex.value++;
-    stage.value = currentPlant.value.stage;
-    updateEncouragement();
-  }
-}
-
-// Sélectionner une plante par clic
-function selectPlant(index: number) {
-  if (index !== currentPlantIndex.value) {
-    currentPlantIndex.value = index;
-    stage.value = plants.value[index].stage;
-    updateEncouragement();
-  }
-}
-
-// Offset du carousel pour centrer la plante active
-const PLANT_WIDTH = 200; // largeur d'une plante inactive
-const ACTIVE_PLANT_WIDTH = 400; // largeur de la plante active
-
-const carouselOffset = computed(() => {
-  const total = plants.value.length;
-  if (total <= 1) return 0;
-
-  // Calculer la largeur totale du carousel
-  // = (total - 1) plantes inactives + 1 plante active
-  const totalWidth = (total - 1) * PLANT_WIDTH + ACTIVE_PLANT_WIDTH;
-
-  // Position du centre de la plante active dans le carousel
-  // Les plantes avant l'active sont inactives (PLANT_WIDTH chacune)
-  const positionOfActiveCenter =
-    currentPlantIndex.value * PLANT_WIDTH + ACTIVE_PLANT_WIDTH / 2;
-
-  // On veut que ce centre soit au milieu du carousel (totalWidth / 2)
-  // Donc on décale de: (totalWidth / 2) - positionOfActiveCenter
-  const offset = totalWidth / 2 - positionOfActiveCenter;
-
-  return offset;
-});
-
-// ViewBox dynamique pour une plante donnée
-function getViewBoxForStage(stg: number) {
-  const viewBoxStartY: Record<number, number> = {
-    0: 650,
-    1: 550,
-    2: 470,
-    3: 380,
-    4: 280,
-    5: 0,
-  };
-  const startY = viewBoxStartY[stg] ?? 550;
-  const height = 800 - startY;
-  return `0 ${startY} 400 ${height}`;
-}
-
-// Chemin de tige pour une plante donnée
-function getStemPathForStage(stg: number) {
-  const stemEndY: Record<number, number> = {
-    1: 600,
-    2: 520,
-    3: 430,
-    4: 340,
-    5: 180,
-  };
-  const endY = stemEndY[stg] ?? 600;
-  return `M200 740 L200 ${endY}`;
-}
-
-function updateEncouragement() {
-  const stg = stage.value;
-  const isLastPlant = currentPlantIndex.value === plants.value.length - 1;
-  if (stg >= 5) {
-    encouragement.value = isLastPlant
-      ? "Ta plante est épanouie — bravo !"
-      : "Magnifique plante !";
-  } else {
-    encouragement.value = isLastPlant
-      ? "Prends soin de ta plante en jouant chaque jour."
-      : "Beau parcours !";
-  }
-}
-
-// Scroll vers la dernière feuille visible
-function scrollToLastLeaf() {
-  if (!plantContainer.value) return;
-
-  // Position Y approximative de chaque feuille dans le SVG (viewBox 800)
-  const leafPositions: Record<number, number> = {
-    1: 620, // feuille 1
-    2: 540, // feuille 2
-    3: 450, // feuille 3
-    4: 360, // feuille 4
-    5: 220, // feuille 5/6 (fleur)
-  };
-
-  const targetLeaf = Math.min(stage.value, 5);
-  if (targetLeaf === 0) return;
-
-  // Calculer le scroll pour centrer sur la dernière feuille
-  const svgHeight = plantContainer.value.scrollHeight;
-  const viewportHeight = window.innerHeight;
-  const leafY = leafPositions[targetLeaf] ?? 400;
-
-  // Ratio pour convertir coordonnées SVG en pixels
-  const ratio = svgHeight / 800;
-  const scrollTarget = leafY * ratio - viewportHeight / 2;
-
-  plantContainer.value.scrollTo({
-    top: Math.max(0, scrollTarget),
-    behavior: "smooth",
-  });
+  const d = new Date(dateStr);
+  return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 }
 
 onMounted(async () => {
   try {
-    const state = await progress.getPlantState();
-    plants.value = state.plants;
-    streak.value = state.totalStreak ?? 0;
-    currentPlantIndex.value = state.currentPlantIndex ?? 0;
-
-    if (plants.value.length > 0) {
-      stage.value = Math.min(5, plants.value[currentPlantIndex.value].stage);
-      updateEncouragement();
-    } else {
-      stage.value = 0;
-      encouragement.value = "Commence à jouer pour faire pousser ta plante !";
+    if (!auth.isLoggedIn.value) {
+      loading.value = false;
+      return;
     }
-  } catch {
-    // Erreur silencieuse
-  } finally {
-    loading.value = false;
 
-    // Scroll vers la dernière feuille après rendu
-    await nextTick();
-    setTimeout(() => scrollToLastLeaf(), 300);
+    // Charger tout en PARALLÈLE (au lieu de séquentiellement)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const startDate = thirtyDaysAgo.toISOString().slice(0, 10);
+    const endDate = new Date().toISOString().slice(0, 10);
+
+    const [streakData, plays] = await Promise.all([
+      progress.getStreak(),
+      progress.getPlaysForDateRange(startDate, endDate),
+    ]);
+
+    streak.value = streakData.streak;
+    recentDays.value = plays.map((p) => ({
+      date: p.date,
+      success: true,
+      moves: p.moves,
+      timeSpentSeconds: p.timeSpentSeconds,
+    }));
+    totalWins.value = plays.length;
+
+    // Calculer meilleur temps et moyenne coups en local (pas de requête!)
+    const times = plays
+      .map((p) => p.timeSpentSeconds)
+      .filter((t): t is number => t !== null);
+    bestTime.value = times.length > 0 ? Math.min(...times) : null;
+
+    const movesArray = plays
+      .map((p) => p.moves)
+      .filter((m): m is number => m !== null);
+    avgMoves.value =
+      movesArray.length > 0
+        ? Math.round(movesArray.reduce((a, b) => a + b, 0) / movesArray.length)
+        : null;
+
+    // Charger amis en PARALLÈLE aussi
+    await loadFriends();
+  } catch (e) {
+    console.error("Erreur chargement progression:", e);
   }
 });
 </script>
 
 <template>
-  <div
-    ref="plantContainer"
-    class="progress-page min-h-screen h-screen relative overflow-hidden flex flex-col"
-  >
-    <!-- Feuilles qui tombent en arrière-plan -->
-    <FallingLeaves />
+  <div class="bg-white min-h-dvh pb-20">
+    <!-- Header -->
+    <AppHeader
+      mode="app"
+    />
 
-    <!-- Header flottant (back + streak + bouton jouer) -->
-    <header
-      class="fixed top-0 left-0 right-0 p-2 sm:p-4 z-50 flex items-center justify-between gap-2 sm:gap-4"
-    >
-      <NuxtLink
-        to="/"
-        class="back-btn w-9 h-9 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center text-white bg-light-500/30 backdrop-blur-sm transition-all hover:bg-light-500/50"
-        aria-label="Retour"
+    <!-- Non connecté -->
+    <div v-if="!auth.isLoggedIn.value" class="px-5 py-16 text-center">
+      <div
+        class="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-2xl flex items-center justify-center"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          width="20"
-          height="20"
+          width="28"
+          height="28"
           viewBox="0 0 24 24"
-          class="sm:w-6 sm:h-6"
           fill="none"
-          stroke="currentColor"
+          stroke="#9ca3af"
           stroke-width="2"
           stroke-linecap="round"
           stroke-linejoin="round"
         >
-          <path d="m12 19-7-7 7-7" />
-          <path d="M19 12H5" />
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
         </svg>
-      </NuxtLink>
-
-      <div
-        class="flex flex-col items-center justify-center"
-        aria-hidden="false"
-      >
-        <div
-          class="text-lg sm:text-2xl font-extrabold text-light-500 drop-shadow-sm"
-        >
-          {{ streak }}
-        </div>
-        <div class="text-xs text-light-500/60 -mt-0.5 sm:-mt-1">jours</div>
       </div>
-
+      <p class="text-gray-500 mb-4">Connecte-toi pour voir ta progression</p>
       <NuxtLink
-        v-if="!loading"
-        to="/games/danmen"
-        class="w-9 h-9 sm:w-12 sm:h-12 flex items-center justify-center bg-light-500/30 text-white rounded-lg transition-all hover:bg-light-500/50"
-        aria-label="Jouer"
+        to="/auth/login"
+        class="inline-block bg-linear-to-r from-pink-500 to-purple-500 text-white px-6 py-3 rounded-xl font-semibold"
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          class="sm:w-5 sm:h-5"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <path d="M5 3v18l15-9L5 3z" />
-        </svg>
+        Se connecter
       </NuxtLink>
-      <div v-else class="w-9 h-9 sm:w-12 sm:h-12" />
-    </header>
-
-    <!-- Loader -->
-    <div
-      v-if="loading"
-      class="loader absolute inset-0 flex items-center justify-center"
-    >
-      <UiSpinner size="xl" />
     </div>
 
-    <!-- Carousel de plantes -->
-    <div
-      v-else-if="plants.length > 0"
-      class="plant-carousel flex-1 flex items-end justify-center pb-8 relative overflow-hidden"
-    >
-      <!-- Conteneur des plantes avec transition -->
-      <div
-        class="plants-container flex items-end justify-center transition-transform duration-500 ease-out"
-        :style="{ transform: `translateX(${carouselOffset}px)` }"
-      >
-        <div
-          v-for="(plant, index) in plants"
-          :key="index"
-          class="plant-item flex-shrink-0 flex items-end justify-center cursor-pointer transition-all duration-500"
-          :class="{
-            'active-plant': index === currentPlantIndex,
-            'inactive-plant': index !== currentPlantIndex,
-            'left-plant': index < currentPlantIndex,
-            'right-plant': index > currentPlantIndex,
-          }"
-          @click="selectPlant(index)"
-        >
-          <svg
-            :viewBox="getViewBoxForStage(plant.stage)"
-            class="plant-svg-item"
-            xmlns="http://www.w3.org/2000/svg"
-            preserveAspectRatio="xMidYMax meet"
+    <template v-else>
+      <!-- Stats rapides -->
+      <section class="px-5 mt-4">
+        <div class="grid grid-cols-4 gap-3">
+          <div
+            class="bg-gray-50 border border-gray-100 rounded-2xl p-3 text-center"
           >
-            <defs>
-              <linearGradient
-                :id="'stemGradient-' + index"
-                x1="0%"
-                y1="100%"
-                x2="0%"
-                y2="0%"
-              >
-                <stop offset="0%" stop-color="#6ec977" />
-                <stop offset="50%" stop-color="#8ed591" />
-                <stop offset="100%" stop-color="#a8e6ae" />
-              </linearGradient>
-
-              <linearGradient
-                :id="'leafGradient-' + index"
-                x1="0%"
-                y1="0%"
-                x2="100%"
-                y2="0%"
-              >
-                <stop offset="0%" stop-color="#6ec977" />
-                <stop offset="50%" stop-color="#8ed591" />
-                <stop offset="100%" stop-color="#a8e6ae" />
-              </linearGradient>
-
-              <radialGradient :id="'petalGradient-' + index">
-                <stop offset="0%" stop-color="#f5d0f5" />
-                <stop offset="50%" stop-color="#e8b3e8" />
-                <stop offset="100%" stop-color="#d896d8" />
-              </radialGradient>
-
-              <radialGradient :id="'centerGradient-' + index">
-                <stop offset="0%" stop-color="#fff9e6" />
-                <stop offset="100%" stop-color="#ffd966" />
-              </radialGradient>
-            </defs>
-
-            <!-- Graine simple -->
-            <g v-if="plant.stage === 0" class="seed-group">
-              <ellipse
-                cx="200"
-                cy="720"
-                rx="25"
-                ry="35"
-                fill="#9575cd"
-                opacity="0.8"
-              />
-              <ellipse
-                cx="195"
-                cy="710"
-                rx="8"
-                ry="12"
-                fill="#b39ddb"
-                opacity="0.5"
-              />
-              <path
-                d="M200 690 L200 705"
-                stroke="#a5d6a7"
-                stroke-width="2"
-                stroke-linecap="round"
-                opacity="0.7"
-              />
-            </g>
-
-            <!-- Plante -->
-            <g v-else class="plant-group">
-              <!-- Tige -->
-              <path
-                :d="getStemPathForStage(plant.stage)"
-                fill="none"
-                stroke="#6ec977"
-                stroke-width="22"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                class="stem"
-              />
-
-              <!-- Feuille 1 -->
-              <g
-                v-if="plant.stage >= 1"
-                class="leaf leaf-1 cursor-pointer"
-                @click.stop="index === currentPlantIndex && onLeafClick(1)"
-              >
-                <path
-                  d="M200 620 Q280 600 320 620 Q300 670 200 620"
-                  :fill="'url(#leafGradient-' + index + ')'"
-                  opacity="0.9"
-                />
-                <path
-                  d="M200 620 L290 635"
-                  stroke="#5fa769"
-                  stroke-width="1.5"
-                  opacity="0.4"
-                />
-              </g>
-
-              <!-- Feuille 2 -->
-              <g
-                v-if="plant.stage >= 2"
-                class="leaf leaf-2 cursor-pointer"
-                @click.stop="index === currentPlantIndex && onLeafClick(2)"
-              >
-                <path
-                  d="M200 540 Q100 510 80 540 Q110 590 200 540"
-                  :fill="'url(#leafGradient-' + index + ')'"
-                  opacity="0.9"
-                />
-                <path
-                  d="M200 540 L110 555"
-                  stroke="#5fa769"
-                  stroke-width="1.5"
-                  opacity="0.4"
-                />
-              </g>
-
-              <!-- Feuille 3 -->
-              <g
-                v-if="plant.stage >= 3"
-                class="leaf leaf-3 cursor-pointer"
-                @click.stop="index === currentPlantIndex && onLeafClick(3)"
-              >
-                <path
-                  d="M200 450 Q300 420 340 450 Q310 510 200 450"
-                  :fill="'url(#leafGradient-' + index + ')'"
-                  opacity="0.9"
-                />
-                <path
-                  d="M200 450 L310 470"
-                  stroke="#5fa769"
-                  stroke-width="1.5"
-                  opacity="0.4"
-                />
-              </g>
-
-              <!-- Feuille 4 -->
-              <g
-                v-if="plant.stage >= 4"
-                class="leaf leaf-4 cursor-pointer"
-                @click.stop="index === currentPlantIndex && onLeafClick(4)"
-              >
-                <path
-                  d="M200 360 Q80 320 60 360 Q100 420 200 360"
-                  :fill="'url(#leafGradient-' + index + ')'"
-                  opacity="0.9"
-                />
-                <path
-                  d="M200 360 L90 380"
-                  stroke="#5fa769"
-                  stroke-width="1.5"
-                  opacity="0.4"
-                />
-              </g>
-
-              <!-- Feuille 5 -->
-              <g
-                v-if="plant.stage >= 5"
-                class="leaf leaf-5 cursor-pointer"
-                @click.stop="index === currentPlantIndex && onLeafClick(5)"
-              >
-                <path
-                  d="M200 270 Q260 255 295 270 Q275 315 200 270"
-                  :fill="'url(#leafGradient-' + index + ')'"
-                  opacity="0.9"
-                />
-              </g>
-
-              <!-- Feuille 6 -->
-              <g v-if="plant.stage >= 5" class="leaf leaf-6">
-                <path
-                  d="M200 220 Q130 200 105 220 Q135 265 200 220"
-                  :fill="'url(#leafGradient-' + index + ')'"
-                  opacity="0.9"
-                />
-              </g>
-
-              <!-- Bourgeon -->
-              <g v-if="plant.stage === 4" class="bud">
-                <ellipse
-                  cx="200"
-                  cy="120"
-                  rx="18"
-                  ry="30"
-                  fill="#d896d8"
-                  opacity="0.7"
-                />
-                <ellipse
-                  cx="200"
-                  cy="110"
-                  rx="12"
-                  ry="20"
-                  fill="#e8b3e8"
-                  opacity="0.5"
-                />
-              </g>
-
-              <!-- Fleur -->
-              <g v-if="plant.stage >= 5" class="flower">
-                <ellipse
-                  cx="200"
-                  cy="70"
-                  rx="35"
-                  ry="50"
-                  :fill="'url(#petalGradient-' + index + ')'"
-                  class="petal"
-                />
-                <ellipse
-                  cx="160"
-                  cy="110"
-                  rx="35"
-                  ry="50"
-                  :fill="'url(#petalGradient-' + index + ')'"
-                  class="petal"
-                  transform="rotate(-72 160 110)"
-                />
-                <ellipse
-                  cx="175"
-                  cy="165"
-                  rx="35"
-                  ry="50"
-                  :fill="'url(#petalGradient-' + index + ')'"
-                  class="petal"
-                  transform="rotate(-144 175 165)"
-                />
-                <ellipse
-                  cx="225"
-                  cy="165"
-                  rx="35"
-                  ry="50"
-                  :fill="'url(#petalGradient-' + index + ')'"
-                  class="petal"
-                  transform="rotate(144 225 165)"
-                />
-                <ellipse
-                  cx="240"
-                  cy="110"
-                  rx="35"
-                  ry="50"
-                  :fill="'url(#petalGradient-' + index + ')'"
-                  class="petal"
-                  transform="rotate(72 240 110)"
-                />
-                <circle
-                  cx="200"
-                  cy="120"
-                  r="22"
-                  :fill="'url(#centerGradient-' + index + ')'"
-                />
-                <circle cx="195" cy="115" r="2" fill="#f4b942" opacity="0.6" />
-                <circle cx="205" cy="115" r="2" fill="#f4b942" opacity="0.6" />
-                <circle cx="200" cy="125" r="2" fill="#f4b942" opacity="0.6" />
-              </g>
-            </g>
-          </svg>
+            <p class="text-2xl font-bold text-pink-500">{{ streak }}</p>
+            <p class="text-[10px] text-gray-400 mt-0.5">Série</p>
+          </div>
+          <div
+            class="bg-gray-50 border border-gray-100 rounded-2xl p-3 text-center"
+          >
+            <p class="text-2xl font-bold text-purple-500">{{ totalWins }}</p>
+            <p class="text-[10px] text-gray-400 mt-0.5">Victoires</p>
+          </div>
+          <div
+            class="bg-gray-50 border border-gray-100 rounded-2xl p-3 text-center"
+          >
+            <p class="text-2xl font-bold text-lime-600">
+              {{ formatTime(bestTime) }}
+            </p>
+            <p class="text-[10px] text-gray-400 mt-0.5">Record</p>
+          </div>
+          <div
+            class="bg-gray-50 border border-gray-100 rounded-2xl p-3 text-center"
+          >
+            <p class="text-2xl font-bold text-gray-900">
+              {{ avgMoves ?? "--" }}
+            </p>
+            <p class="text-[10px] text-gray-400 mt-0.5">Moy. coups</p>
+          </div>
         </div>
-      </div>
+      </section>
 
-      <!-- Flèche gauche -->
-      <button
-        v-if="plants.length > 1 && currentPlantIndex > 0"
-        @click="previousPlant"
-        class="nav-arrow nav-arrow-left"
-        aria-label="Plante précédente"
-      >
-        <svg
-          class="w-6 h-6"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M15 19l-7-7 7-7"
-          />
-        </svg>
-      </button>
-
-      <!-- Flèche droite -->
-      <button
-        v-if="plants.length > 1 && currentPlantIndex < plants.length - 1"
-        @click="nextPlant"
-        class="nav-arrow nav-arrow-right"
-        aria-label="Plante suivante"
-      >
-        <svg
-          class="w-6 h-6"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M9 5l7 7-7 7"
-          />
-        </svg>
-      </button>
-
-      <!-- Indicateurs de points -->
-      <div v-if="plants.length > 1" class="dots-indicator">
-        <button
-          v-for="(plant, index) in plants"
-          :key="'dot-' + index"
-          @click="selectPlant(index)"
-          class="dot"
-          :class="{ 'dot-active': index === currentPlantIndex }"
-          :aria-label="'Plante ' + (index + 1)"
-        />
-      </div>
-    </div>
-
-    <!-- Graine flottante quand aucun niveau joué -->
-    <div
-      v-else-if="!loading"
-      class="floating-seed-container flex-1 flex items-center justify-center"
-    >
-      <svg
-        class="floating-seed w-32 h-40 sm:w-40 sm:h-52"
-        viewBox="0 0 100 130"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <defs>
-          <radialGradient id="seedGradient" cx="30%" cy="30%">
-            <stop offset="0%" stop-color="#b39ddb" />
-            <stop offset="70%" stop-color="#9575cd" />
-            <stop offset="100%" stop-color="#7e57c2" />
-          </radialGradient>
-          <radialGradient id="seedHighlight" cx="35%" cy="25%">
-            <stop offset="0%" stop-color="#fff" stop-opacity="0.4" />
-            <stop offset="100%" stop-color="#fff" stop-opacity="0" />
-          </radialGradient>
-        </defs>
-        <!-- Corps de la graine -->
-        <ellipse cx="50" cy="75" rx="30" ry="45" fill="url(#seedGradient)" />
-        <!-- Reflet -->
-        <ellipse cx="40" cy="55" rx="12" ry="20" fill="url(#seedHighlight)" />
-        <!-- Petite pousse qui émerge -->
-        <path
-          d="M50 30 Q55 20 50 10 Q45 20 50 30"
-          fill="#a5d6a7"
-          opacity="0.8"
-        />
-        <path
-          d="M50 30 L50 35"
-          stroke="#8bc34a"
-          stroke-width="2"
-          stroke-linecap="round"
-        />
-      </svg>
-    </div>
-
-    <!-- Overlay infos en bas (sans titre stage, streak en haut) -->
-    <div
-      v-if="!loading"
-      class="info-overlay fixed bottom-0 left-0 right-0 px-4 pt-6 pb-8 text-center z-20"
-    >
-      <p class="text-base text-light-500/70 mb-5">{{ encouragement }}</p>
-    </div>
-
-    <!-- Popup stats feuille -->
-    <Teleport to="body">
-      <Transition name="fade">
-        <div
-          v-if="showStatsPopup"
-          class="fixed inset-0 z-[100] flex items-center justify-center p-4"
-          @click.self="closePopup"
-        >
-          <!-- Backdrop -->
-          <div
-            class="absolute inset-0 bg-dark-500/30 backdrop-blur-sm"
-            @click="closePopup"
-          />
-
-          <!-- Card -->
-          <div
-            class="relative bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full animate-popup"
-          >
-            <button
-              class="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full hover:bg-dark-500/10 transition-colors"
-              @click="closePopup"
+      <!-- Calendrier 30 jours -->
+      <section class="px-5 mt-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-3">
+          30 derniers jours
+        </h2>
+        <div class="bg-gray-50 border border-gray-100 rounded-2xl p-4">
+          <div class="grid grid-cols-10 gap-1.5">
+            <div
+              v-for="day in last30Days"
+              :key="day.date"
+              class="aspect-square rounded-lg flex items-center justify-center text-xs font-medium transition-colors"
+              :class="
+                day.played
+                  ? 'bg-pink-500 text-white shadow-sm shadow-pink-500/20'
+                  : 'bg-gray-200/60 text-gray-400'
+              "
+              :title="day.date"
             >
-              <svg
-                class="w-5 h-5 text-dark-500/60"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
+              {{ day.label }}
+            </div>
+          </div>
+          <div class="flex items-center gap-3 mt-3 text-xs text-gray-400">
+            <div class="flex items-center gap-1.5">
+              <div class="w-3 h-3 rounded bg-pink-500" />
+              <span>Joué</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <div class="w-3 h-3 rounded bg-gray-200/60" />
+              <span>Pas joué</span>
+            </div>
+          </div>
+        </div>
+      </section>
 
-            <div class="text-center">
+      <!-- Historique récent -->
+      <section class="px-5 mt-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-3">
+          Parties récentes
+        </h2>
+        <div v-if="recentDays.length === 0" class="text-center py-8">
+          <p class="text-gray-400 text-sm">Aucune partie récente</p>
+        </div>
+        <div v-else class="space-y-2">
+          <div
+            v-for="play in recentDays.slice().reverse().slice(0, 7)"
+            :key="play.date"
+            class="bg-gray-50 border border-gray-100 rounded-xl p-3.5 flex items-center justify-between"
+          >
+            <div class="flex items-center gap-3">
               <div
-                class="w-16 h-16 mx-auto mb-4 rounded-full bg-purple-500/20 flex items-center justify-center"
+                class="w-10 h-10 rounded-xl flex items-center justify-center text-lg"
+                :class="
+                  play.success
+                    ? 'bg-pink-500/10 text-pink-500'
+                    : 'bg-gray-100 text-gray-400'
+                "
               >
-                <svg
-                  class="w-8 h-8 text-purple-500"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"
-                  />
-                </svg>
+                {{ play.success ? "✓" : "✗" }}
               </div>
-
-              <h3 class="text-xl font-semibold text-dark-500 mb-1">
-                Jour {{ selectedLeaf }}
-              </h3>
-              <p class="text-sm text-dark-500/60 mb-6">
-                {{ leafStats?.date ?? "" }}
-              </p>
-
-              <div class="grid grid-cols-2 gap-4">
-                <div class="bg-purple-500/15 rounded-xl p-4">
-                  <div class="text-2xl font-bold text-purple-500">
-                    {{ leafStats?.moves ?? "--" }}
-                  </div>
-                  <div class="text-xs text-dark-500/60 mt-1">Coups</div>
-                </div>
-                <div class="bg-indigo-500/15 rounded-xl p-4">
-                  <div class="text-2xl font-bold text-indigo-500">
-                    {{ formatTime(leafStats?.timeSpentSeconds ?? null) }}
-                  </div>
-                  <div class="text-xs text-dark-500/60 mt-1">Temps</div>
-                </div>
+              <div>
+                <p class="text-sm font-medium text-gray-900">
+                  {{ formatDate(play.date) }}
+                </p>
+                <p class="text-xs text-gray-400">
+                  {{ play.moves != null ? `${play.moves} coups` : "" }}
+                  {{
+                    play.moves != null && play.timeSpentSeconds != null
+                      ? " · "
+                      : ""
+                  }}
+                  {{
+                    play.timeSpentSeconds != null
+                      ? formatTime(play.timeSpentSeconds)
+                      : ""
+                  }}
+                </p>
               </div>
             </div>
           </div>
         </div>
-      </Transition>
-    </Teleport>
+      </section>
+
+      <!-- Section Amis -->
+      <section class="px-5 mt-8">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-lg font-semibold text-gray-900">Amis</h2>
+          <button
+            class="w-8 h-8 bg-pink-500/10 text-pink-500 rounded-lg flex items-center justify-center active:scale-95 transition-transform"
+            @click="showAddFriend = !showAddFriend"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <line x1="19" x2="19" y1="8" y2="14" />
+              <line x1="22" x2="16" y1="11" y2="11" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- Barre de recherche amis -->
+        <Transition name="slide">
+          <div
+            v-if="showAddFriend"
+            class="mb-4 bg-gray-50 border border-gray-100 rounded-2xl p-4"
+          >
+            <p class="text-sm text-gray-500 mb-2">
+              Recherche un joueur par pseudo
+            </p>
+            <input
+              v-model="searchQuery"
+              type="text"
+              placeholder="Pseudo..."
+              class="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/30 focus:border-pink-500 transition-colors"
+              @input="onSearchInput"
+            />
+
+            <!-- Résultats de recherche -->
+            <div v-if="searching" class="text-center py-3">
+              <div
+                class="w-5 h-5 border-2 border-pink-500 border-t-transparent rounded-full animate-spin mx-auto"
+              />
+            </div>
+            <div v-else-if="searchResults.length > 0" class="mt-3 space-y-2">
+              <div
+                v-for="user in searchResults"
+                :key="user.id"
+                class="flex items-center justify-between p-2.5 bg-white rounded-xl border border-gray-100"
+              >
+                <div class="flex items-center gap-3">
+                  <div
+                    class="w-9 h-9 rounded-full bg-linear-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-sm font-semibold"
+                  >
+                    {{ user.username.charAt(0).toUpperCase() }}
+                  </div>
+                  <span class="text-sm font-medium text-gray-900">{{
+                    user.username
+                  }}</span>
+                </div>
+                <button
+                  v-if="!friendsComposable.isFriend(user.id)"
+                  class="text-xs bg-pink-500 text-white px-3 py-1.5 rounded-lg font-medium active:scale-95 transition-transform"
+                  @click="addFriend(user.id)"
+                >
+                  Ajouter
+                </button>
+                <span v-else class="text-xs text-gray-400 font-medium"
+                  >Déjà ami</span
+                >
+              </div>
+            </div>
+            <p
+              v-else-if="searchQuery.length >= 2 && !searching"
+              class="text-xs text-gray-400 mt-3 text-center"
+            >
+              Aucun résultat
+            </p>
+          </div>
+        </Transition>
+
+        <!-- Liste des amis -->
+        <div
+          v-if="friendsList.length === 0 && !showAddFriend"
+          class="text-center py-8"
+        >
+          <div
+            class="w-14 h-14 mx-auto mb-3 bg-gray-100 rounded-2xl flex items-center justify-center"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#9ca3af"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <line x1="19" x2="19" y1="8" y2="14" />
+              <line x1="22" x2="16" y1="11" y2="11" />
+            </svg>
+          </div>
+          <p class="text-gray-400 text-sm mb-1">Pas encore d'amis</p>
+          <p class="text-gray-300 text-xs">
+            Ajoute des amis pour comparer vos scores
+          </p>
+        </div>
+
+        <div v-else class="space-y-2">
+          <!-- Classement : Toi d'abord -->
+          <div
+            class="bg-linear-to-r from-pink-500/5 to-purple-500/5 border border-pink-500/10 rounded-xl p-3.5 flex items-center gap-3"
+          >
+            <div
+              class="w-8 h-8 rounded-full bg-linear-to-br from-pink-500 to-purple-500 flex items-center justify-center text-white text-xs font-bold shrink-0"
+            >
+              {{
+                auth.displayName.value
+                  ? auth.displayName.value.charAt(0).toUpperCase()
+                  : "?"
+              }}
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-semibold text-gray-900 truncate">
+                {{ auth.displayName.value ?? "Toi" }}
+                <span
+                  class="text-[10px] text-pink-500 bg-pink-500/10 px-1.5 py-0.5 rounded-full ml-1"
+                  >Toi</span
+                >
+              </p>
+            </div>
+            <div class="flex items-center gap-4 shrink-0">
+              <div class="text-center">
+                <p class="text-sm font-bold text-pink-500">{{ streak }}</p>
+                <p class="text-[9px] text-gray-400">série</p>
+              </div>
+              <div class="text-center">
+                <p class="text-sm font-bold text-gray-900">{{ totalWins }}</p>
+                <p class="text-[9px] text-gray-400">victoires</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Amis -->
+          <div
+            v-for="friend in friendsList"
+            :key="friend.id"
+            class="bg-gray-50 border border-gray-100 rounded-xl p-3.5 flex items-center gap-3"
+          >
+            <div
+              class="w-8 h-8 rounded-full bg-linear-to-br from-purple-400 to-purple-600 flex items-center justify-center text-white text-xs font-bold shrink-0"
+            >
+              {{ friend.username.charAt(0).toUpperCase() }}
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-medium text-gray-900 truncate">
+                {{ friend.username }}
+              </p>
+            </div>
+            <div class="flex items-center gap-4 shrink-0">
+              <div class="text-center">
+                <p class="text-sm font-bold text-pink-500">
+                  {{ friend.streak }}
+                </p>
+                <p class="text-[9px] text-gray-400">série</p>
+              </div>
+              <div class="text-center">
+                <p class="text-sm font-bold text-gray-900">
+                  {{ friend.totalWins }}
+                </p>
+                <p class="text-[9px] text-gray-400">victoires</p>
+              </div>
+              <button
+                class="w-7 h-7 flex items-center justify-center rounded-lg text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors"
+                title="Retirer"
+                @click="removeFriendHandler(friend.id)"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <line x1="18" x2="6" y1="6" y2="18" />
+                  <line x1="6" x2="18" y1="6" y2="18" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </template>
   </div>
 </template>
 
 <style scoped>
-/* Background gradient - Thème hivernal sombre avec couleurs du projet */
-.progress-page {
-  background: linear-gradient(
-    180deg,
-    #131313 0%,
-    #1f1f1f 30%,
-    #1a1a1a 60%,
-    #131313 100%
-  );
+.slide-enter-active,
+.slide-leave-active {
+  transition: all 0.3s ease;
+  overflow: hidden;
 }
 
-/* Graine flottante */
-.floating-seed-container {
-  position: relative;
-}
-
-.floating-seed {
-  animation: float-seed 3s ease-in-out infinite;
-  filter: drop-shadow(0 20px 40px rgba(149, 117, 205, 0.3));
-}
-
-@keyframes float-seed {
-  0%,
-  100% {
-    transform: translateY(0) rotate(-3deg);
-  }
-  50% {
-    transform: translateY(-20px) rotate(3deg);
-  }
-}
-
-/* Décor hivernal - lueur glaçée subtile sur fond sombre */
-.sky-subtle::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: transparent;
-  pointer-events: none;
-  animation: shimmer 8s ease-in-out infinite;
-}
-
-@keyframes shimmer {
-  0%,
-  100% {
-    opacity: 0.7;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
-/* Plante plein écran */
-.plant-fullscreen {
-  position: relative;
-}
-
-.plant-fullscreen::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(
-    ellipse at center bottom,
-    rgba(129, 199, 132, 0.2) 0%,
-    transparent 60%
-  );
-  pointer-events: none;
-}
-
-.plant-svg {
-  width: 90%;
-  height: auto;
-  max-width: 500px;
-  min-height: 50vh;
-  max-height: calc(100vh - 100px);
-  filter: drop-shadow(0 10px 40px rgba(129, 199, 132, 0.2));
-  position: relative;
-  z-index: 1;
-}
-
-/* Animations plante - croissance douce */
-.soil {
-  animation: soil-appear 0.8s ease-out forwards;
+.slide-enter-from,
+.slide-leave-to {
   opacity: 0;
+  max-height: 0;
+  margin-bottom: 0;
 }
 
-@keyframes soil-appear {
-  to {
-    opacity: 1;
-  }
-}
-
-.stem {
-  /* Afficher la tige immédiatement, sans masquage par dash animation */
-  stroke-dasharray: none;
-  stroke-dashoffset: 0;
+.slide-enter-to,
+.slide-leave-from {
   opacity: 1;
-}
-
-/* Feuilles apparaissent avec rotation douce */
-.leaf {
-  opacity: 0;
-  transform-origin: 200px center;
-  animation: leaf-unfold 1.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-}
-
-.leaf-1 {
-  animation-delay: 0.5s;
-}
-.leaf-2 {
-  animation-delay: 0.8s;
-}
-.leaf-3 {
-  animation-delay: 1.1s;
-}
-.leaf-4 {
-  animation-delay: 1.4s;
-}
-.leaf-5 {
-  animation-delay: 1.7s;
-}
-.leaf-6 {
-  animation-delay: 2s;
-}
-
-@keyframes leaf-unfold {
-  0% {
-    opacity: 0;
-    transform: scaleX(0) rotate(90deg);
-  }
-  60% {
-    transform: scaleX(1.1) rotate(-5deg);
-  }
-  100% {
-    opacity: 1;
-    transform: scaleX(1) rotate(0deg);
-  }
-}
-
-/* Légère ondulation des feuilles */
-.leaf path {
-  animation: leaf-sway 6s ease-in-out infinite;
-  transform-origin: center;
-}
-
-.leaf-1 path {
-  animation-delay: 0s;
-}
-.leaf-2 path {
-  animation-delay: 1s;
-}
-.leaf-3 path {
-  animation-delay: 2s;
-}
-.leaf-4 path {
-  animation-delay: 3s;
-}
-.leaf-5 path {
-  animation-delay: 4s;
-}
-.leaf-6 path {
-  animation-delay: 5s;
-}
-
-@keyframes leaf-sway {
-  0%,
-  100% {
-    transform: translateY(0) rotate(0deg);
-  }
-  25% {
-    transform: translateY(-3px) rotate(1deg);
-  }
-  75% {
-    transform: translateY(3px) rotate(-1deg);
-  }
-}
-
-/* Hover sur les feuilles cliquables */
-.leaf.cursor-pointer {
-  transition:
-    transform 0.2s ease,
-    filter 0.2s ease;
-}
-
-.leaf.cursor-pointer:hover {
-  transform: scale(1.08);
-  filter: brightness(1.1) drop-shadow(0 4px 8px rgba(110, 201, 119, 0.4));
-}
-
-/* Fleur épanouie */
-.flower {
-  opacity: 0;
-  animation: flower-bloom 1.5s cubic-bezier(0.34, 1.56, 0.64, 1) 2.2s forwards;
-}
-
-@keyframes flower-bloom {
-  0% {
-    opacity: 0;
-    transform: scale(0) rotate(-90deg);
-  }
-  60% {
-    transform: scale(1.15) rotate(5deg);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1) rotate(0deg);
-  }
-}
-
-/* Pétales dansent doucement */
-.petal {
-  animation: petal-dance 4s ease-in-out infinite;
-  transform-origin: 200px 140px;
-}
-
-.petal-1 {
-  animation-delay: 0s;
-}
-.petal-2 {
-  animation-delay: 0.5s;
-}
-.petal-3 {
-  animation-delay: 1s;
-}
-.petal-4 {
-  animation-delay: 1.5s;
-}
-.petal-5 {
-  animation-delay: 2s;
-}
-
-@keyframes petal-dance {
-  0%,
-  100% {
-    transform: rotate(0deg) scale(1);
-  }
-  25% {
-    transform: rotate(2deg) scale(1.03);
-  }
-  75% {
-    transform: rotate(-2deg) scale(0.97);
-  }
-}
-
-/* Graine qui pulse */
-.seed-group {
-  animation: seed-pulse 2.5s ease-in-out infinite;
-  transform-origin: center;
-}
-
-@keyframes seed-pulse {
-  0%,
-  100% {
-    transform: scale(1);
-    filter: brightness(1);
-  }
-  50% {
-    transform: scale(1.05);
-    filter: brightness(1.15);
-  }
-}
-
-/* Bourgeon qui respire */
-.bud {
-  animation: bud-breathe 2.5s ease-in-out infinite;
-  transform-origin: 200px 120px;
-}
-
-@keyframes bud-breathe {
-  0%,
-  100% {
-    transform: scaleY(1);
-  }
-  50% {
-    transform: scaleY(1.08);
-  }
-}
-
-/* Info overlay */
-.info-overlay {
-  background: linear-gradient(
-    to top,
-    rgba(19, 19, 19, 0.95) 0%,
-    rgba(31, 31, 31, 0.7) 50%,
-    transparent 100%
-  );
-  backdrop-filter: blur(10px);
-}
-
-/* Popup animations */
-.animate-popup {
-  animation: popup-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-}
-
-@keyframes popup-in {
-  0% {
-    opacity: 0;
-    transform: scale(0.9) translateY(20px);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-}
-
-/* Fade transition */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-
-/* ===== CAROUSEL DE PLANTES ===== */
-.plant-carousel {
-  position: relative;
-}
-
-.plant-carousel::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: transparent;
-  pointer-events: none;
-}
-
-.plants-container {
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 0;
-  min-height: 50vh;
-}
-
-.plant-item {
-  position: relative;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-}
-
-/* Plante active - très grande et au centre */
-.active-plant {
-  z-index: 10;
-  width: 100%;
-  max-width: 600px;
-}
-
-.active-plant .plant-svg-item {
-  width: 100%;
-  max-width: 400px;
-  height: auto;
-  min-height: 50vh;
-  max-height: calc(100vh - 120px);
-  filter: drop-shadow(0 10px 40px rgba(129, 212, 250, 0.25));
-}
-
-@media (min-width: 640px) {
-  .active-plant .plant-svg-item {
-    max-width: 600px;
-    min-height: 65vh;
-  }
-}
-
-/* Plantes inactives - moyennes sur les côtés */
-.inactive-plant {
-  z-index: 5;
-  width: 100px;
-  opacity: 0.6;
-  align-self: flex-end;
-  transform: translateY(-30px);
-}
-
-.inactive-plant .plant-svg-item {
-  width: 90px;
-  max-width: 90px;
-  height: auto;
-  min-height: 35vh;
-  max-height: calc(60vh - 30px);
-  filter: grayscale(30%) drop-shadow(0 5px 20px rgba(129, 212, 250, 0.1));
-}
-
-.inactive-plant:hover {
-  opacity: 0.8;
-  transform: scale(1.1) translateY(-30px);
-}
-
-@media (min-width: 640px) {
-  .inactive-plant {
-    width: 220px;
-    transform: translateY(-60px);
-  }
-
-  .inactive-plant .plant-svg-item {
-    width: 200px;
-    max-width: 200px;
-    min-height: 50vh;
-    max-height: calc(70vh - 60px);
-  }
-
-  .inactive-plant:hover {
-    transform: scale(1.1) translateY(-60px);
-  }
-}
-
-/* Plantes à gauche */
-.left-plant {
-  margin-right: -20px;
-}
-
-/* Plantes à droite */
-.right-plant {
-  margin-left: -20px;
-}
-
-@media (min-width: 640px) {
-  .left-plant {
-    margin-right: -40px;
-  }
-
-  .right-plant {
-    margin-left: -40px;
-  }
-}
-
-/* Flèches de navigation */
-.nav-arrow {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 30;
-  padding: 8px;
-  border-radius: 50%;
-  background: rgba(79, 195, 247, 0.3);
-  color: #4fc3f7;
-  transition: all 0.2s ease;
-  border: none;
-  cursor: pointer;
-  font-size: 18px;
-}
-
-.nav-arrow:hover {
-  background: rgba(79, 195, 247, 0.5);
-  color: #29b6f6;
-}
-
-@media (min-width: 640px) {
-  .nav-arrow {
-    padding: 12px;
-    font-size: 24px;
-  }
-}
-
-.nav-arrow-left {
-  left: 8px;
-}
-
-.nav-arrow-right {
-  right: 8px;
-}
-
-@media (min-width: 640px) {
-  .nav-arrow-left {
-    left: 12px;
-  }
-
-  .nav-arrow-right {
-    right: 12px;
-  }
-}
-
-/* Indicateurs (dots) */
-.dots-indicator {
-  position: absolute;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 8px;
-  z-index: 25;
-}
-
-.dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: rgba(254, 254, 254, 0.3);
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.dot:hover {
-  background: rgba(254, 254, 254, 0.5);
-}
-
-.dot-active {
-  background: #4fc3f7;
-  transform: scale(1.2);
-}
-
-.dot-active:hover {
-  background: #29b6f6;
+  max-height: 400px;
 }
 </style>

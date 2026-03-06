@@ -69,7 +69,7 @@ function onInput(event: Event) {
           @input="onInput"
           @keyup.enter="save"
           @keyup.escape="cancel"
-        >
+        />
         <button
           type="button"
           class="w-8 h-8 rounded-lg bg-green-100 text-green-600 hover:bg-green-200 flex items-center justify-center transition-colors cursor-pointer"

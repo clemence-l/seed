@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { DanmenLevel, CellState } from "../../../lib/games/danmen/types";
-import type { DanmenBoardExposed } from "../../../components/DanmenBoard.vue";
+
+type GameLevel = DanmenLevel;
 
 // Utiliser le layout minimal (sans header/footer/nav)
 definePageMeta({
@@ -85,59 +86,48 @@ function todayUtcYYYYMMDD(): string {
 
 const day = computed(() => todayUtcYYYYMMDD());
 
-const level = ref<DanmenLevel | null>(null);
+const SUPPORTED_GAMES = ["danmen"] as const;
+const isSupportedGame = computed(() =>
+  SUPPORTED_GAMES.includes(gameName.value as (typeof SUPPORTED_GAMES)[number]),
+);
+const isDanmen = computed(() => gameName.value === "danmen");
+
+const level = ref<GameLevel | null>(null);
 const pending = ref<boolean>(true);
 const error = ref<Error | null>(null);
+
+const danmenLevel = computed(() =>
+  isDanmen.value ? (level.value as DanmenLevel | null) : null,
+);
 
 async function loadDaily(): Promise<void> {
   pending.value = true;
   error.value = null;
   level.value = null;
 
-  // Pour l’instant on gère seulement Danmen
-  if (gameName.value !== "danmen") {
+  if (!isSupportedGame.value) {
     error.value = new Error("Jeu non supporté pour le moment");
     pending.value = false;
     return;
   }
 
+  // Une seule requête pour aujourd'hui OU hier (triée par date desc → prend le plus récent)
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toISOString().slice(0, 10);
+
   const { data, error: supaError } = await supabase
     .from("levels")
     .select("data")
     .eq("game_id", gameName.value)
-    .eq("day", day.value)
+    .in("day", [day.value, yesterdayStr])
     .eq("active", true)
-    .maybeSingle<{ data: DanmenLevel }>();
-
-  if (supaError) {
-    // Supabase error (handled silently in UI)
-  }
+    .order("day", { ascending: false })
+    .limit(1)
+    .maybeSingle<{ data: GameLevel }>();
 
   if (supaError || !data) {
-    // Fallback : niveau de la veille
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().slice(0, 10);
-
-    const { data: yesterdayData, error: yesterdayError } = await supabase
-      .from("levels")
-      .select("data")
-      .eq("game_id", gameName.value)
-      .eq("day", yesterdayStr)
-      .eq("active", true)
-      .maybeSingle<{ data: DanmenLevel }>();
-
-    if (yesterdayError) {
-      // Yesterday fallback error (handled silently)
-    }
-
-    if (yesterdayData) {
-      level.value = yesterdayData.data;
-    } else {
-      error.value = new Error(
-        "Aucun niveau disponible pour aujourd'hui ou hier",
-      );
-    }
+    error.value = new Error("Aucun niveau disponible pour aujourd'hui ou hier");
   } else {
     level.value = data.data;
   }
@@ -314,8 +304,10 @@ async function handleComplete(): Promise<void> {
   saveTimer(id, store.value);
 
   // Récupérer stats du board
-  const movesCount = boardRef.value?.getMoves?.() ?? 0;
-  const gridSnapshot: CellState[][] = boardRef.value?.getGrid?.() ?? [];
+  const movesCount = isDanmen.value ? (boardRef.value?.getMoves?.() ?? 0) : 0;
+  const gridSnapshot: CellState[][] = isDanmen.value
+    ? (boardRef.value?.getGrid?.() ?? [])
+    : [];
 
   // Enregistrer le play en base UNIQUEMENT si connecté
   if (auth.isLoggedIn.value && playId.value) {
@@ -337,9 +329,18 @@ async function handleComplete(): Promise<void> {
       timeSpentSeconds: elapsedSeconds.value,
       moves: movesCount,
       day: day.value,
-      difficulty: level.value?.difficulty ?? 1,
-      rowCounts: level.value?.rowCounts ?? [],
-      colCounts: level.value?.colCounts ?? [],
+      difficulty:
+        isDanmen.value && danmenLevel.value
+          ? (danmenLevel.value.difficulty ?? 1)
+          : 1,
+      rowCounts:
+        isDanmen.value && danmenLevel.value
+          ? (danmenLevel.value.rowCounts ?? [])
+          : [],
+      colCounts:
+        isDanmen.value && danmenLevel.value
+          ? (danmenLevel.value.colCounts ?? [])
+          : [],
     };
     sessionStorage.setItem(`seed:bravo:${id}`, JSON.stringify(bravoData));
   }
@@ -371,9 +372,13 @@ watch(
     // Ne pas exécuter la logique si le niveau est déjà complété
     if (isCompleted.value) return;
 
-    // Si connecté, vérifier si le niveau est déjà gagné
+    // Si connecté, vérifier si le niveau est déjà gagné et créer le play en parallèle
     if (auth.isLoggedIn.value) {
-      const alreadyWon = await plays.isLevelAlreadyWon(levelId);
+      const [alreadyWon, newPlayId] = await Promise.all([
+        plays.isLevelAlreadyWon(levelId),
+        plays.startPlay(levelId).catch(() => null),
+      ]);
+
       if (alreadyWon) {
         await navigateTo({
           path: `/games/${gameName.value}/bravo`,
@@ -382,15 +387,16 @@ watch(
         return;
       }
 
-      // Créer (ou récupérer) l'entrée play "started"
-      playId.value = await plays.startPlay(levelId);
+      playId.value = newPlayId;
     }
     // Si non connecté, on peut quand même jouer sans sauvegarder
   },
   { immediate: true },
 );
 
-const boardRef = ref<DanmenBoardExposed | null>(null);
+const boardRef = ref<InstanceType<
+  typeof import("~/components/DanmenBoard.vue").default
+> | null>(null);
 </script>
 
 <template>
@@ -416,27 +422,28 @@ const boardRef = ref<DanmenBoardExposed | null>(null);
           @dismiss="dismissLoginPrompt"
         />
 
-        <!-- Sous-header: chrono -->
+        <!-- Sous-header Danmen: modes + chrono -->
         <div
+          v-if="isDanmen"
           class="w-full max-w-120 flex items-center justify-between mb-4 px-2"
         >
           <div class="flex items-center gap-2">
             <!-- Bouton pour sélectionner le mode rond -->
             <button
               aria-label="Mode rond"
-              class="w-10 h-10 flex items-center justify-center rounded border border-purple-500 bg-purple-500 hover:bg-purple-500/80 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 active:bg-purple-500/90 transition-all duration-200"
+              class="w-10 h-10 flex items-center justify-center border border-purple-500 bg-purple-500 hover:bg-purple-500/80 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 active:bg-purple-500/90 transition-all duration-200"
               :class="{
                 'ring-2 ring-dark-500':
                   boardRef?.getSelectedMode?.() === 'circle',
               }"
               @click="boardRef?.setSelectedMode?.('circle')"
             >
-              <span class="w-2/5 h-2/5 rounded-full bg-light-500" />
+              <span class="w-2/5 h-2/5 bg-light-500" />
             </button>
             <!-- Bouton pour sélectionner le mode croix -->
             <button
               aria-label="Mode croix"
-              class="w-10 h-10 flex items-center justify-center rounded border border-dark-500/30 hover:bg-dark-500/10 focus:outline-none focus:ring-2 focus:ring-dark-500 focus:ring-offset-2 active:bg-dark-500/20 transition-all duration-200"
+              class="w-10 h-10 flex items-center justify-center border border-dark-500/30 hover:bg-dark-500/10 focus:outline-none focus:ring-2 focus:ring-dark-500 focus:ring-offset-2 active:bg-dark-500/20 transition-all duration-200"
               :class="{
                 'ring-2 ring-dark-500':
                   boardRef?.getSelectedMode?.() === 'cross',
@@ -478,7 +485,13 @@ const boardRef = ref<DanmenBoardExposed | null>(null);
           </div>
         </div>
 
-        <DanmenBoard ref="boardRef" :level="level" @complete="handleComplete" />
+        <!-- Board Danmen -->
+        <DanmenBoard
+          v-if="danmenLevel"
+          ref="boardRef"
+          :level="danmenLevel"
+          @complete="handleComplete"
+        />
       </div>
     </div>
 

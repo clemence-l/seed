@@ -462,7 +462,7 @@ onBeforeUnmount(() => {
     >
       <!-- Panel du tutoriel -->
       <div
-        class="bg-light-500 rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden"
+        class="bg-light-500 shadow-2xl w-full max-w-sm mx-4 rounded-2xl overflow-hidden"
       >
         <!-- Header -->
         <div
@@ -512,15 +512,15 @@ onBeforeUnmount(() => {
             <!-- Boutons de sélection de mode (à partir de l'étape 3) -->
             <div v-if="showModeButtons" class="flex justify-center gap-2 mb-4">
               <button
-                class="w-10 h-10 flex items-center justify-center rounded border border-purple-500 bg-purple-500 hover:bg-purple-500/80 focus:outline-none active:bg-purple-500/90 transition-all duration-200"
+                class="w-10 h-10 rounded-lg flex items-center justify-center border border-purple-500 bg-purple-500 hover:bg-purple-500/80 focus:outline-none active:bg-purple-500/90 transition-all duration-200"
                 :class="{ 'ring-2 ring-dark-500': selectedMode === 'circle' }"
                 @click="selectedMode = 'circle'"
                 aria-label="Mode rond"
               >
-                <span class="w-2/5 h-2/5 rounded-full bg-light-500" />
+                <span class="w-2/5 h-2/5 bg-light-500" />
               </button>
               <button
-                class="w-10 h-10 flex items-center justify-center rounded border border-dark-500/30 hover:bg-dark-500/10 focus:outline-none active:bg-dark-500/20 transition-all duration-200"
+                class="w-10 h-10 rounded-lg flex items-center justify-center border border-dark-500/30 hover:bg-dark-500/10 focus:outline-none active:bg-dark-500/20 transition-all duration-200"
                 :class="{ 'ring-2 ring-dark-500': selectedMode === 'cross' }"
                 @click="selectedMode = 'cross'"
                 aria-label="Mode croix"
@@ -542,7 +542,7 @@ onBeforeUnmount(() => {
 
             <!-- Grille de tutoriel -->
             <div
-              class="bg-dark-500 rounded-xl p-0.75 mx-auto"
+              class="bg-dark-500 p-0.75 mx-auto"
               :style="{
                 width: currentStep?.gridSize === 5 ? '220px' : '160px',
               }"
@@ -574,7 +574,7 @@ onBeforeUnmount(() => {
                     <span
                       v-for="d in groupDots(c.groups)"
                       :key="d"
-                      class="w-1 h-1 rounded-full bg-light-500"
+                      class="w-1 h-1 bg-light-500"
                     />
                   </div>
                 </div>
@@ -593,7 +593,7 @@ onBeforeUnmount(() => {
                           currentStep.rules.rows[r - 1]?.groups ?? 0,
                         )"
                         :key="d"
-                        class="w-1 h-1 rounded-full bg-light-500"
+                        class="w-1 h-1 bg-light-500"
                       />
                     </div>
                   </div>
@@ -605,16 +605,12 @@ onBeforeUnmount(() => {
                       cellState(r - 1, c - 1) === 'filled'
                         ? 'bg-indigo-500'
                         : 'bg-lavender-500',
-                      r === 1 && c === 1 ? 'rounded-tl-md' : '',
+                      r === 1 && c === 1 ? '' : '',
                       r === currentStep.gridSize && c === currentStep.gridSize
-                        ? 'rounded-br-md'
+                        ? ''
                         : '',
-                      r === 1 && c === currentStep.gridSize
-                        ? 'rounded-tr-md'
-                        : '',
-                      r === currentStep.gridSize && c === 1
-                        ? 'rounded-bl-md'
-                        : '',
+                      r === 1 && c === currentStep.gridSize ? '' : '',
+                      r === currentStep.gridSize && c === 1 ? '' : '',
                     ]"
                     style="touch-action: none"
                     :disabled="isGiven(r - 1, c - 1)"
@@ -629,7 +625,7 @@ onBeforeUnmount(() => {
                       v-if="cellState(r - 1, c - 1) === 'filled'"
                       class="absolute inset-0 flex items-center justify-center"
                     >
-                      <span class="w-2/5 h-2/5 rounded-full bg-light-500" />
+                      <span class="w-2/5 h-2/5 bg-light-500" />
                     </span>
                     <span
                       v-else-if="cellState(r - 1, c - 1) === 'empty'"
@@ -677,7 +673,7 @@ onBeforeUnmount(() => {
               <!-- Grille simple sans règles -->
               <div
                 v-else
-                class="grid rounded-lg overflow-hidden"
+                class="grid overflow-hidden"
                 :style="{
                   gridTemplateColumns: `repeat(${currentStep?.gridSize ?? 3}, 1fr)`,
                   gap: '2px',
@@ -709,7 +705,7 @@ onBeforeUnmount(() => {
                       v-if="cellState(r - 1, c - 1) === 'filled'"
                       class="absolute inset-0 flex items-center justify-center"
                     >
-                      <span class="w-2/5 h-2/5 rounded-full bg-light-500" />
+                      <span class="w-2/5 h-2/5 bg-light-500" />
                     </span>
                     <span
                       v-else-if="cellState(r - 1, c - 1) === 'empty'"

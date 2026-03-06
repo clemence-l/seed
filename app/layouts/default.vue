@@ -1,9 +1,7 @@
 <template>
-  <div class="min-h-screen">
-    <main
-      class="relative z-10 bg-light-500 min-h-screen rounded-b-3xl mb-64 shadow-xl"
-    >
-      <MyHeader />
+  <div class="min-h-screen bg-white">
+    <AppHeader />
+    <main class="relative z-10 bg-white min-h-screen pt-20">
       <slot />
     </main>
     <MyFooter />

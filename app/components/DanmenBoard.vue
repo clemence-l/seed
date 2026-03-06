@@ -198,8 +198,8 @@ function groupDots(n: number) {
 
 /** Détermine les classes de coins arrondis pour chaque case */
 function cornerClass(r: number, c: number, size: number) {
-  if (r === 0 && c === 0) return "rounded-tl-lg";
-  if (r === size - 1 && c === size - 1) return "rounded-br-xl";
+  if (r === 0 && c === 0) return "";
+  if (r === size - 1 && c === size - 1) return "";
   return "";
 }
 
@@ -455,7 +455,7 @@ defineExpose<DanmenBoardExposed>({
   <div class="flex flex-col gap-4 w-full max-w-md mx-auto">
     <!-- Board wrapper : fond dark continu -->
     <div
-      class="bg-dark-500 rounded-xl border border-dark-500 p-0 overflow-hidden"
+      class="bg-dark-500 border border-dark-500 rounded-xl p-0 overflow-hidden"
     >
       <!-- Grid layout : rules gauche | (rules haut + grille) -->
       <div
@@ -479,7 +479,7 @@ defineExpose<DanmenBoardExposed>({
             <span
               v-for="d in groupDots(c.groups)"
               :key="d"
-              class="w-1.5 h-1.5 rounded-full bg-light-500"
+              class="w-1.5 h-1.5 bg-light-500"
             />
           </div>
         </div>
@@ -497,7 +497,7 @@ defineExpose<DanmenBoardExposed>({
               <span
                 v-for="d in groupDots(level.rules.rows[r - 1]?.groups ?? 0)"
                 :key="d"
-                class="w-1.5 h-1.5 rounded-full bg-light-500"
+                class="w-1.5 h-1.5 bg-light-500"
               />
             </div>
           </div>
@@ -526,7 +526,7 @@ defineExpose<DanmenBoardExposed>({
               v-if="cellState(r - 1, c - 1) === 'filled'"
               class="absolute inset-0 flex items-center justify-center"
             >
-              <span class="w-2/5 h-2/5 rounded-full bg-light-500" />
+              <span class="w-2/5 h-2/5 bg-light-500" />
             </span>
             <!-- Case croix : svg -->
             <span

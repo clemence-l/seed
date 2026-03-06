@@ -94,7 +94,7 @@ onMounted(async () => {
       <!-- Error state -->
       <div v-else-if="error" class="space-y-6">
         <div
-          class="w-16 h-16 mx-auto rounded-full bg-red-100 flex items-center justify-center"
+          class="w-16 h-16 mx-auto bg-red-100 flex items-center justify-center"
         >
           <svg
             class="w-8 h-8 text-red-500"

@@ -12,7 +12,7 @@ function goBack() {
 
 <template>
   <div
-    class="progress-page min-h-screen flex items-center justify-center px-4 rounded-b-3xl"
+    class="progress-page min-h-screen flex items-center justify-center px-4"
   >
     <div class="text-center max-w-md">
       <!-- Emoji triste -->
