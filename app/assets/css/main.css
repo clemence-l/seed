@@ -6,7 +6,7 @@
   --color-pink-500: #fd00b8;
   --color-lime-500: #aaff00;
   --color-purple-500: #5533ef;
-  --color-dark-500: #0D0D0D;
+  --color-dark-500: #0d0d0d;
   --color-light-500: #fdfefe;
 
   /* Legacy aliases for compatibility */
@@ -115,4 +115,125 @@ body {
 
 .animation-delay-400 {
   animation-delay: 400ms;
+}
+
+/* Dark Mode */
+.dark {
+  color-scheme: dark;
+}
+
+.dark body {
+  color: #fdfefe;
+  background-color: #0d0d0d;
+}
+
+/* Dark mode: fond noir, texte blanc */
+.dark .bg-white,
+.dark .bg-light {
+  @apply bg-dark-500;
+}
+
+.dark .text-dark-500 {
+  @apply text-light-500;
+}
+
+.dark .text-white {
+  @apply text-light-500;
+}
+
+.dark .text-dark-500\/70 {
+  @apply text-light-500/70;
+}
+
+.dark .text-dark-500\/60 {
+  @apply text-light-500/60;
+}
+
+.dark .text-dark-500\/40 {
+  @apply text-light-500/40;
+}
+
+.dark .text-gray-900 {
+  @apply text-light-500;
+}
+
+.dark .text-gray-400 {
+  @apply text-light-500/60;
+}
+
+.dark .bg-black\/50 {
+  @apply bg-white/20;
+}
+
+.dark .border-gray-200 {
+  @apply border-light-500/20;
+}
+
+.dark .border-dark-500 {
+  @apply border-light-500;
+}
+
+.dark .bg-dark-500\/20 {
+  @apply bg-light-500/10;
+}
+
+.dark .bg-dark-500\/40 {
+  @apply bg-light-500/10;
+}
+
+.dark .bg-dark-500\/60 {
+  @apply bg-light-500/20;
+}
+
+/* Preserve explicit light backgrounds (e.g. game cards) */
+.dark .bg-light-500 {
+  background-color: var(--color-light-500) !important;
+}
+
+/* Inputs and forms */
+.dark input,
+.dark textarea {
+  @apply bg-dark-500 text-light-500 border-light-500/20;
+}
+
+.dark input:focus,
+.dark textarea:focus {
+  @apply border-light-500;
+}
+
+/* Buttons - invert primary buttons */
+.dark button.bg-dark-500 {
+  @apply bg-light-500 text-dark-500;
+}
+
+.dark button.bg-dark-500:hover,
+.dark button.bg-dark-500:active {
+  @apply bg-light-500/90;
+}
+
+/* Cards and containers */
+.dark .rounded-xl,
+.dark .rounded-2xl,
+.dark .rounded-lg {
+  @apply bg-dark-500;
+}
+
+/* Shadow and depth */
+.dark .shadow-lg,
+.dark .shadow-xl {
+  @apply shadow-light-500/10;
+}
+
+/* Icons - invert only icons, not content images */
+.dark header svg:not([src*="profile"]),
+.dark header img:not([src*="profile"])[src$=".svg"],
+.dark nav svg:not([src*="profile"]),
+.dark nav img:not([src*="profile"])[src$=".svg"],
+.dark button svg:not([src*="profile"]),
+.dark button img:not([src*="profile"])[src$=".svg"],
+.dark [class*="Bottom"] svg:not([src*="profile"]),
+.dark [class*="Bottom"] img:not([src*="profile"])[src$=".svg"],
+.dark [class*="Header"] svg:not([src*="profile"]),
+.dark [class*="Header"] img:not([src*="profile"])[src$=".svg"] {
+  filter: invert(1);
 }
