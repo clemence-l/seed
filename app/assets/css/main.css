@@ -190,6 +190,19 @@ body {
   background-color: var(--color-light-500) !important;
 }
 
+/* Danmen card: keep same light background in dark mode */
+.dark .danmen-card,
+.dark .danmen-card .bg-dark-500,
+.dark .danmen-card .bg-lavender-500,
+.dark .danmen-card .bg-indigo-500 {
+  background-color: var(--color-light-500) !important;
+}
+
+/* Ensure border and text contrast on Danmen card */
+.dark .danmen-card {
+  border-color: var(--color-dark-500)/10 !important;
+}
+
 /* Inputs and forms */
 .dark input,
 .dark textarea {

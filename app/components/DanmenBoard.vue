@@ -455,7 +455,7 @@ defineExpose<DanmenBoardExposed>({
   <div class="flex flex-col gap-4 w-full max-w-md mx-auto">
     <!-- Board wrapper : fond dark continu -->
     <div
-      class="bg-dark-500 border border-dark-500 rounded-xl p-0 overflow-hidden"
+      class="danmen-card bg-dark-500 border border-dark-500 rounded-xl p-0 overflow-hidden"
     >
       <!-- Grid layout : rules gauche | (rules haut + grille) -->
       <div
