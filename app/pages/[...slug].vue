@@ -11,9 +11,7 @@ function goBack() {
 </script>
 
 <template>
-  <div
-    class="progress-page min-h-screen flex items-center justify-center px-4"
-  >
+  <div class="progress-page min-h-screen flex items-center justify-center px-4">
     <div class="text-center max-w-md">
       <!-- Emoji triste -->
       <div class="text-8xl mb-8">🌱</div>
@@ -32,12 +30,8 @@ function goBack() {
 
       <!-- Boutons -->
       <div class="flex gap-3 justify-center">
-        <UiButton variant="secondary" size="lg" @click="goBack">
-          ← Retour
-        </UiButton>
-        <UiButton variant="primary" size="lg" @click="goHome">
-          Accueil
-        </UiButton>
+        <UiButton size="md" @click="goBack"> ← Retour </UiButton>
+        <UiButton size="md" @click="goHome"> Accueil </UiButton>
       </div>
     </div>
   </div>

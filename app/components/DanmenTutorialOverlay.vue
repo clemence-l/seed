@@ -542,7 +542,7 @@ onBeforeUnmount(() => {
 
             <!-- Grille de tutoriel -->
             <div
-              class="bg-dark-500 p-0.75 mx-auto"
+              class="bg-dark-500 p-0.75 mx-auto rounded-xl overflow-hidden"
               :style="{
                 width: currentStep?.gridSize === 5 ? '220px' : '160px',
               }"
@@ -600,17 +600,11 @@ onBeforeUnmount(() => {
                   <button
                     v-for="c in currentStep.gridSize"
                     :key="`${r - 1}-${c - 1}`"
-                    class="aspect-square flex items-center justify-center transition-all relative"
+                    class="aspect-square flex items-center justify-center transition-all relative rounded-lg"
                     :class="[
                       cellState(r - 1, c - 1) === 'filled'
                         ? 'bg-indigo-500'
                         : 'bg-lavender-500',
-                      r === 1 && c === 1 ? '' : '',
-                      r === currentStep.gridSize && c === currentStep.gridSize
-                        ? ''
-                        : '',
-                      r === 1 && c === currentStep.gridSize ? '' : '',
-                      r === currentStep.gridSize && c === 1 ? '' : '',
                     ]"
                     style="touch-action: none"
                     :disabled="isGiven(r - 1, c - 1)"
@@ -673,7 +667,7 @@ onBeforeUnmount(() => {
               <!-- Grille simple sans règles -->
               <div
                 v-else
-                class="grid overflow-hidden"
+                class="grid"
                 :style="{
                   gridTemplateColumns: `repeat(${currentStep?.gridSize ?? 3}, 1fr)`,
                   gap: '2px',

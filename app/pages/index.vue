@@ -17,7 +17,7 @@ const games = [
     name: "Danmen",
     to: "/games/danmen",
     color: "bg-purple-500/90",
-    description: "Trouve la pièce manquante",
+    description: "Place les ronds en respectant les contraintes",
     image: "/img/danmen.svg",
   },
 ];
@@ -44,9 +44,9 @@ const games = [
       >
         <!-- Title: top left -->
         <div class="absolute top-5 left-5 right-5 pr-16 flex flex-col">
-          <h2 class="font-bold text-xl mb-1 break-words">{{ game.name }}</h2>
+          <h2 class="font-bold text-xl mb-1 wrap-break-words">{{ game.name }}</h2>
           <p
-            class="text-sm text-white/80 break-words whitespace-normal line-clamp-2"
+            class="text-sm text-white/80 wrap-break-words whitespace-normal line-clamp-2"
           >
             {{ game.description }}
           </p>

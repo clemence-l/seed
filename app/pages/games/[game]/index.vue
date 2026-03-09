@@ -364,6 +364,28 @@ watch(
 const auth = useAuth();
 const plays = usePlays();
 
+/** Attend que l'auth soit prête (session restaurée depuis localStorage) */
+function waitForAuthReady(): Promise<void> {
+  if (auth.ready.value) return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    const stop = watch(
+      () => auth.ready.value,
+      (v) => {
+        if (v) {
+          stop();
+          resolve();
+        }
+      },
+      { immediate: true },
+    );
+    // safety timeout
+    setTimeout(() => {
+      stop();
+      resolve();
+    }, 5000);
+  });
+}
+
 watch(
   () => level.value?.id,
   async (levelId) => {
@@ -371,6 +393,9 @@ watch(
 
     // Ne pas exécuter la logique si le niveau est déjà complété
     if (isCompleted.value) return;
+
+    // Attendre que l'auth soit prête avant de vérifier la connexion
+    await waitForAuthReady();
 
     // Si connecté, vérifier si le niveau est déjà gagné et créer le play en parallèle
     if (auth.isLoggedIn.value) {
@@ -431,19 +456,19 @@ const boardRef = ref<InstanceType<
             <!-- Bouton pour sélectionner le mode rond -->
             <button
               aria-label="Mode rond"
-              class="w-10 h-10 flex items-center justify-center border border-purple-500 bg-purple-500 hover:bg-purple-500/80 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 active:bg-purple-500/90 transition-all duration-200"
+              class="w-10 h-10 rounded-lg flex items-center justify-center border border-purple-500 bg-purple-500 hover:bg-purple-500/80 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 active:bg-purple-500/90 transition-all duration-200"
               :class="{
                 'ring-2 ring-dark-500':
                   boardRef?.getSelectedMode?.() === 'circle',
               }"
               @click="boardRef?.setSelectedMode?.('circle')"
             >
-              <span class="w-2/5 h-2/5 bg-light-500" />
+              <span class="w-2/5 h-2/5 bg-light-500 rounded-full" />
             </button>
             <!-- Bouton pour sélectionner le mode croix -->
             <button
               aria-label="Mode croix"
-              class="w-10 h-10 flex items-center justify-center border border-dark-500/30 hover:bg-dark-500/10 focus:outline-none focus:ring-2 focus:ring-dark-500 focus:ring-offset-2 active:bg-dark-500/20 transition-all duration-200"
+              class="w-10 h-10 rounded-lg flex items-center justify-center border border-dark-500/30 hover:bg-dark-500/10 focus:outline-none focus:ring-2 focus:ring-dark-500 focus:ring-offset-2 active:bg-dark-500/20 transition-all duration-200"
               :class="{
                 'ring-2 ring-dark-500':
                   boardRef?.getSelectedMode?.() === 'cross',

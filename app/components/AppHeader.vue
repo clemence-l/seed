@@ -9,6 +9,7 @@ defineProps<{
 const emit = defineEmits<{
   goBack: [];
   openRules: [];
+  openSettings: [];
 }>();
 </script>
 
@@ -27,13 +28,13 @@ const emit = defineEmits<{
     class="fixed top-0 left-0 right-0 bg-white py-3 px-5 flex items-center justify-between z-50 border-b border-dark-500/5"
   >
     <h1 class="font-bold text-lg">{{ displayName }}</h1>
-    <NuxtLink to="/settings">
+    <button @click="emit('openSettings')">
       <NuxtImg
         src="/img/settings.svg"
         alt="Settings"
-        class="w-6 h-6 object-contain"
+        class="w-5 h-5 object-contain"
       />
-    </NuxtLink>
+    </button>
   </div>
 
   <!-- Game Header (back, title, rules) -->

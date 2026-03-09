@@ -1,15 +1,31 @@
 <script setup lang="ts">
 import UiAlert from "../components/ui/Alert.vue";
 
-definePageMeta({ layout: "mobile" });
+definePageMeta({
+  layout: "mobile",
+  ssr: false, // Désactiver SSR car la page gère l'auth client-only
+});
 
-const router = useRouter();
 const auth = useAuth();
 const progress = useProgress();
 const messages = useMessages();
 
 const avatarInput = ref<HTMLInputElement | null>(null);
 const uploadingAvatar = ref(false);
+const settingsSheet = ref<{ open: () => void; close: () => void } | null>(null);
+const authSheet = ref<{ open: () => void; close: () => void } | null>(null);
+
+function openSettings() {
+  settingsSheet.value?.open();
+}
+
+function openAuthLogin() {
+  authSheet.value?.open();
+}
+
+function openAuthRegister() {
+  authSheet.value?.open();
+}
 const streak = ref(0);
 const streakCount = ref(0); // nombre de victoires
 const localDisplayName = ref<string | null>(null);
@@ -22,30 +38,36 @@ useHead(() => ({
   title: `Seed | ${displayName.value}`,
 }));
 
-onMounted(async () => {
-  await auth.initAuth();
-  if (!auth.isLoggedIn.value) {
-    await router.push("/auth/login");
-    return;
-  }
-  try {
-    // Paralléliser toutes les requêtes
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const startDate = thirtyDaysAgo.toISOString().slice(0, 10);
-    const endDate = new Date().toISOString().slice(0, 10);
+const statsLoaded = ref(false);
 
-    const [streakData, plays] = await Promise.all([
-      progress.getStreak(),
-      progress.getPlaysForDateRange(startDate, endDate),
-    ]);
+// Charger les stats dès que l'auth est prête (réactif, pas juste onMounted)
+watch(
+  () => auth.ready.value,
+  async (ready) => {
+    if (!ready) return;
+    if (!auth.isLoggedIn.value) return;
+    if (statsLoaded.value) return; // ne charger qu'une fois
 
-    streak.value = streakData.streak;
-    streakCount.value = plays.length;
-  } catch (e) {
-    console.error("Erreur chargement stats:", e);
-  }
-});
+    try {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const startDate = thirtyDaysAgo.toISOString().slice(0, 10);
+      const endDate = new Date().toISOString().slice(0, 10);
+
+      const [streakData, plays] = await Promise.all([
+        progress.getStreak(),
+        progress.getPlaysForDateRange(startDate, endDate),
+      ]);
+
+      streak.value = streakData.streak;
+      streakCount.value = plays.length;
+      statsLoaded.value = true;
+    } catch (e) {
+      console.error("Erreur chargement stats:", e);
+    }
+  },
+  { immediate: true },
+);
 
 function triggerAvatarUpload() {
   avatarInput.value?.click();
@@ -59,13 +81,21 @@ async function handleAvatarChange(event: Event) {
     messages.setError("Le fichier doit être une image");
     return;
   }
-  if (file.size > 2 * 1024 * 1024) {
-    messages.setError("L'image ne doit pas dépasser 2MB");
-    return;
-  }
   uploadingAvatar.value = true;
   messages.clearAll();
-  const result = await auth.updateAvatar(file);
+
+  // Compresser l'image avant upload (512x512, JPEG 80%)
+  const { compressImage } = useImageCompress();
+  let fileToUpload: File;
+  try {
+    fileToUpload = await compressImage(file, 512, 512, 0.8);
+  } catch {
+    messages.setError("Impossible de compresser l'image");
+    uploadingAvatar.value = false;
+    return;
+  }
+
+  const result = await auth.updateAvatar(fileToUpload);
   uploadingAvatar.value = false;
   if (result.success) {
     messages.setSuccess("Photo de profil mise à jour");
@@ -79,18 +109,20 @@ async function handleAvatarChange(event: Event) {
 <template>
   <main class="min-h-dvh bg-white text-gray-900 pb-20">
     <!-- Header -->
-    <AppHeader mode="profile" :display-name="displayName" />
+    <AppHeader
+      mode="profile"
+      :display-name="displayName"
+      @open-settings="openSettings"
+    />
+
+    <!-- Settings Sheet -->
+    <SettingsSheet ref="settingsSheet" />
+
+    <!-- Auth Sheet -->
+    <AuthSheet ref="authSheet" />
 
     <!-- Content -->
     <div class="pt-16 px-5 py-6">
-      <UiAlert
-        v-if="messages.success.value"
-        type="success"
-        dismissible
-        class="mb-4"
-      >
-        {{ messages.success.value }}
-      </UiAlert>
       <UiAlert
         v-if="messages.error.value"
         type="error"
@@ -118,11 +150,15 @@ async function handleAvatarChange(event: Event) {
             />
             <button
               :disabled="uploadingAvatar"
-              class="absolute bottom-0 right-0 bg-gray-900 text-white w-7 h-7 rounded-full flex items-center justify-center hover:bg-gray-800 transition-colors disabled:opacity-50"
+              class="absolute bottom-0 right-0 bg-dark-500 text-white w-7 h-7 rounded-full flex items-center justify-center hover:bg-gray-800 transition-colors disabled:opacity-50"
               title="Modifier la photo"
               @click="triggerAvatarUpload"
             >
-              ✏
+              <NuxtImg
+                src="/img/pencil.svg"
+                alt="Modifier"
+                class="w-3.5 h-3.5 brightness-0 invert"
+              />
             </button>
           </div>
           <input
@@ -180,9 +216,27 @@ async function handleAvatarChange(event: Event) {
         </div>
       </template>
 
-      <UiAlert v-else-if="auth.error.value" type="error" class="text-center">
-        {{ auth.error.value }}
-      </UiAlert>
+      <!-- Non connecté : Afficher les boutons d'auth -->
+      <template v-else>
+        <div
+          class="flex flex-col items-center justify-center min-h-[calc(100dvh-200px)]"
+        >
+          <p class="text-center text-gray-600 mb-6 text-base">
+            Connecte-toi pour voir ton profil et tes statistiques !
+          </p>
+          <div class="mb-3">
+            <UiButton @click="openAuthRegister">
+              Créer un compte gratuitement
+            </UiButton>
+          </div>
+          <button
+            class="text-dark-500 font-light underline"
+            @click="openAuthLogin"
+          >
+            Se connecter
+          </button>
+        </div>
+      </template>
     </div>
   </main>
 </template>

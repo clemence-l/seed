@@ -209,9 +209,7 @@ function goProfile() {
       <h1 class="text-2xl font-bold text-dark-500 mb-4">
         Aucune donnée disponible
       </h1>
-      <UiButton variant="primary" size="md" @click="goProgress"
-        >Retour à la progression</UiButton
-      >
+      <UiButton size="md" @click="goProgress">Retour à la progression</UiButton>
     </div>
 
     <!-- Contenu normal -->
@@ -303,20 +301,10 @@ function goProfile() {
 
       <!-- Boutons -->
       <div class="flex flex-col gap-3 items-center">
-        <UiButton
-          variant="primary"
-          size="lg"
-          class="w-full max-w-xs"
-          @click="goProgress"
-        >
+        <UiButton size="md" class="w-full max-w-xs" @click="goProgress">
           Voir ma progression
         </UiButton>
-        <UiButton
-          variant="secondary"
-          size="lg"
-          class="w-full max-w-xs"
-          @click="goProfile"
-        >
+        <UiButton size="md" class="w-full max-w-xs" @click="goProfile">
           Mon profil
         </UiButton>
       </div>

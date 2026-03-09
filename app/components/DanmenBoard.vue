@@ -472,14 +472,14 @@ defineExpose<DanmenBoardExposed>({
         <div
           v-for="(c, j) in level.rules.cols"
           :key="'col-' + j"
-          class="flex flex-col items-center justify-center bg-dark-500 aspect-square relative overflow-hidden"
+          class="flex flex-col items-center justify-center bg-dark-500 aspect-square relative overflow-hidden p-1"
         >
-          <span class="font-bold text-sm text-light-500">{{ c.count }}</span>
-          <div class="flex gap-1 mt-1">
+          <span class="font-bold text-xs text-light-500">{{ c.count }}</span>
+          <div class="flex gap-0.5 mt-0.5">
             <span
               v-for="d in groupDots(c.groups)"
               :key="d"
-              class="w-1.5 h-1.5 bg-light-500"
+              class="w-1 h-1 rounded-full bg-light-500"
             />
           </div>
         </div>
@@ -488,16 +488,16 @@ defineExpose<DanmenBoardExposed>({
         <template v-for="r in size" :key="'row-' + r">
           <!-- Rule de la ligne -->
           <div
-            class="flex flex-col items-center justify-center bg-dark-500 aspect-square relative overflow-hidden"
+            class="flex flex-col items-center justify-center bg-dark-500 aspect-square relative overflow-hidden p-1"
           >
-            <span class="font-bold text-sm text-light-500">{{
+            <span class="font-bold text-xs text-light-500">{{
               level.rules.rows[r - 1]?.count
             }}</span>
-            <div class="flex gap-1 mt-1">
+            <div class="flex gap-0.5 mt-0.5">
               <span
                 v-for="d in groupDots(level.rules.rows[r - 1]?.groups ?? 0)"
                 :key="d"
-                class="w-1.5 h-1.5 bg-light-500"
+                class="w-1 h-1 rounded-full bg-light-500"
               />
             </div>
           </div>
@@ -526,7 +526,7 @@ defineExpose<DanmenBoardExposed>({
               v-if="cellState(r - 1, c - 1) === 'filled'"
               class="absolute inset-0 flex items-center justify-center"
             >
-              <span class="w-2/5 h-2/5 bg-light-500" />
+              <span class="w-2/5 h-2/5 rounded-full bg-light-500" />
             </span>
             <!-- Case croix : svg -->
             <span
@@ -574,23 +574,13 @@ defineExpose<DanmenBoardExposed>({
     </div>
     <!-- Boutons: Effacer, Annuler -->
     <div class="flex justify-center gap-4">
-      <UiButton variant="secondary" size="md" @click="reset">Effacer</UiButton>
+      <UiButton size="md" @click="reset">Effacer</UiButton>
 
-      <UiButton variant="secondary" size="md" :disabled="!canUndo" @click="undo"
-        >Annuler</UiButton
-      >
-
-      <!-- Bouton Indice (commenté pour l'instant)
-      <UiButton
-        variant="secondary"
-        size="md"
-        :disabled="!canUseHint"
-        @click="useHint"
-      >
+      <UiButton size="md" :disabled="!canUndo" @click="undo">Annuler</UiButton>
+      <UiButton size="md" :disabled="!canUseHint" @click="useHint">
         <template v-if="hintCooldownLeft === 0">Indice</template>
         <template v-else>Indice ({{ hintCooldownLeft }}s)</template>
       </UiButton>
-      -->
     </div>
   </div>
 </template>

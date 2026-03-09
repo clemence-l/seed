@@ -136,8 +136,7 @@ async function handleSubmit(): Promise<void> {
           <!-- Submit -->
           <UiButton
             type="submit"
-            variant="primary"
-            size="lg"
+            size="md"
             class="w-full"
             :disabled="auth.loading.value"
           >
@@ -160,14 +159,14 @@ async function handleSubmit(): Promise<void> {
             <UiButton
               variant="outline"
               size="md"
-              class="w-full flex items-center justify-center gap-3"
+              class="w-full"
               @click="onProvider('google')"
               :disabled="auth.loading.value"
             >
               <UiIcon src="/img/google.png" class="w-4 h-4 object-contain" />
-              <span>{{
+              {{
                 isLogin ? "Se connecter avec Google" : "S'inscrire avec Google"
-              }}</span>
+              }}
             </UiButton>
           </div>
         </div>

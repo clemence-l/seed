@@ -120,7 +120,7 @@ onMounted(async () => {
           </p>
         </div>
 
-        <UiButton variant="primary" @click="router.push('/auth/login')">
+        <UiButton @click="router.push('/auth/login')">
           Retour à la connexion
         </UiButton>
       </div>

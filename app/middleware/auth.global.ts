@@ -1,12 +1,14 @@
 export default defineNuxtRouteMiddleware(async (to) => {
+  // Auth is client-only (session stored in localStorage) — skip during SSR
+  if (import.meta.server) return;
+
   if (to.path.startsWith("/auth")) return;
   if (to.path.startsWith("/games")) return;
+  if (to.path.startsWith("/legal")) return;
 
-  // Pour les autres pages protégées (ex: /profile), vérifier la connexion
   const auth = useAuth();
 
-  // Si le module d'auth n'est pas encore prêt (restauration de session en cours),
-  // attendre un court laps de temps avant de décider de rediriger.
+  // Attendre que l'auth soit prête (le plugin client devrait déjà l'avoir fait)
   if (!auth.ready.value) {
     await new Promise<void>((resolve) => {
       const stop = watch(
@@ -17,21 +19,17 @@ export default defineNuxtRouteMiddleware(async (to) => {
             resolve();
           }
         },
+        { immediate: true },
       );
 
-      // timeout safety (3s)
+      // timeout safety (5s)
       setTimeout(() => {
         if (typeof stop === "function") stop();
         resolve();
-      }, 3000);
+      }, 5000);
     });
   }
 
-  // Rediriger vers login uniquement pour les pages protégées
-  if (to.path === "/profile" && !auth.isLoggedIn.value) {
-    return navigateTo({
-      path: "/auth/login",
-      query: { redirect: to.fullPath },
-    });
-  }
+  // /profile est accessible avec ou sans connexion
+  // La page profile gère l'affichage conditionnel elle-même
 });

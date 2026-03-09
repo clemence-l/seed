@@ -95,7 +95,7 @@ function cancelPassword() {
 </script>
 
 <template>
-  <div class=" border border-dark-500/10 bg-white p-6 shadow-sm">
+  <div class="border border-dark-500/10 bg-white p-6 shadow-sm">
     <div class="flex items-center justify-between mb-6">
       <h3 class="text-lg font-semibold text-dark-500">
         Informations du compte
@@ -118,7 +118,7 @@ function cancelPassword() {
               placeholder="nouveau@email.com"
               @keyup.enter="saveEmail"
               @keyup.escape="cancelEmail"
-            >
+            />
             <button
               type="button"
               class="w-8 h-8 bg-green-100 text-green-600 hover:bg-green-200 flex items-center justify-center transition-colors cursor-pointer"
@@ -169,7 +169,7 @@ function cancelPassword() {
               placeholder="TonPseudo"
               @keyup.enter="saveUsername"
               @keyup.escape="cancelUsername"
-            >
+            />
             <button
               type="button"
               class="w-8 h-8 bg-green-100 text-green-600 hover:bg-green-200 flex items-center justify-center transition-colors cursor-pointer"
@@ -212,30 +212,22 @@ function cancelPassword() {
               type="password"
               class="w-full border border-dark-500/20 bg-light-500 px-3 py-2 text-dark-500 outline-none focus:border-dark-500 focus:ring-1 focus:ring-dark-500"
               placeholder="Nouveau mot de passe"
-            >
+            />
             <input
               v-model="confirmPassword"
               type="password"
               class="w-full border border-dark-500/20 bg-light-500 px-3 py-2 text-dark-500 outline-none focus:border-dark-500 focus:ring-1 focus:ring-dark-500"
               placeholder="Confirmer le mot de passe"
               @keyup.enter="savePassword"
-            >
+            />
             <p v-if="passwordError" class="text-xs text-red-600">
               {{ passwordError }}
             </p>
             <div class="flex items-center gap-2">
-              <UiButton
-                variant="success"
-                size="md"
-                class="flex-1"
-                @click="savePassword"
+              <UiButton size="md" class="flex-1" @click="savePassword"
                 >Enregistrer</UiButton
               >
-              <UiButton
-                variant="danger"
-                size="md"
-                class="flex-1"
-                @click="cancelPassword"
+              <UiButton size="md" class="flex-1" @click="cancelPassword"
                 >Annuler</UiButton
               >
             </div>

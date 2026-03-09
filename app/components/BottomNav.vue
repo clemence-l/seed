@@ -1,6 +1,7 @@
 <script setup lang="ts">
 const route = useRoute();
-const { isLoggedIn, initAuth } = useAuth();
+const auth = useAuth();
+const { initAuth, profile } = auth;
 
 onMounted(() => {
   initAuth();
@@ -20,10 +21,11 @@ const navItems = computed(() => [
     active: route.path === "/progress",
   },
   {
-    to: isLoggedIn.value ? "/profile" : "/auth/login",
+    to: "/profile",
     label: "Moi",
     iconSrc: "/img/profile.svg",
-    active: ["/profile", "/auth/login"].includes(route.path),
+    active: route.path === "/profile",
+    isProfileTab: true,
   },
 ]);
 </script>
@@ -40,14 +42,33 @@ const navItems = computed(() => [
         class="flex-1 flex flex-col items-center justify-center h-full gap-0.5 transition-colors"
         :class="item.active ? 'text-dark-500' : 'text-dark-500/40'"
       >
-        <!-- Icon -->
+        <!-- Avatar or Icon -->
+        <div v-if="item.isProfileTab" class="w-5 h-5">
+          <NuxtImg
+            v-if="profile?.avatar_url"
+            :src="profile.avatar_url"
+            :alt="item.label"
+            class="w-5 h-5 rounded-full object-cover"
+          />
+          <NuxtImg
+            v-else
+            :src="item.iconSrc"
+            :alt="item.label"
+            class="w-5 h-5"
+            :class="{
+              'opacity-100': item.active,
+              'opacity-40': !item.active,
+            }"
+          />
+        </div>
         <NuxtImg
+          v-else
           :src="item.iconSrc"
           :alt="item.label"
           class="w-5 h-5"
           :class="{
-            'opacity-100': item.active || item.iconSrc === '/img/profile.svg',
-            'opacity-40': !item.active && item.iconSrc !== '/img/profile.svg',
+            'opacity-100': item.active,
+            'opacity-40': !item.active,
           }"
         />
         <span class="text-[11px] font-medium leading-tight whitespace-nowrap">{{
