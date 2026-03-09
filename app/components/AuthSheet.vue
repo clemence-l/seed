@@ -8,6 +8,9 @@ const step = ref<"email" | "password">("email");
 const isOpen = ref(false);
 const loading = ref(false);
 
+const touchStartY = ref(0);
+const sheetElement = ref<HTMLElement | null>(null);
+
 const email = ref("");
 const password = ref("");
 const passwordConfirm = ref("");
@@ -72,7 +75,7 @@ async function handleEmailSubmit() {
 
     // Si compte existant avec provider OAuth, afficher alerte native du système
     if (isExisting.value && userProvider.value) {
-      window.alert(`Cette adresse email est déjà associée à un compte ${userProvider.value}.\n\nConnecte-toi via ${userProvider.value} pour accéder à ton compte.`);
+      window.alert(`Essayer une autre méthode\nCette adresse email est déjà associée à un compte ${userProvider.value}.`);
       email.value = "";
     } else {
       step.value = "password";
@@ -127,6 +130,45 @@ async function handlePasswordSubmit() {
   }
 }
 
+async function handleOAuthSignIn(provider: "google" | "apple" | "linkedin") {
+  try {
+    loading.value = true;
+    messages.clearAll();
+
+    const supabase = useNuxtApp().$supabase;
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+
+    if (error) {
+      messages.setError(`Erreur de connexion avec ${provider}`);
+      console.error(error);
+    }
+  } catch (e) {
+    messages.setError("Une erreur est survenue");
+    console.error(e);
+  } finally {
+    loading.value = false;
+  }
+}
+
+function handleTouchStart(e: TouchEvent) {
+  touchStartY.value = e.touches[0].clientY;
+}
+
+function handleTouchEnd(e: TouchEvent) {
+  const touchEndY = e.changedTouches[0]?.clientY;
+  const diff = touchEndY ? touchEndY - touchStartY.value : 0;
+
+  // Si glissement vers le bas > 80px, fermer la sheet
+  if (diff > 80) {
+    close();
+  }
+}
+
 defineExpose({ open, close });
 </script>
 
@@ -140,8 +182,11 @@ defineExpose({ open, close });
   <Transition name="slide-up">
     <div
       v-if="isOpen"
+      ref="sheetElement"
       style="height: 96vh; z-index: 51"
       class="fixed bottom-0 left-0 right-0 bg-white rounded-t-xl shadow-lg flex flex-col"
+      @touchstart="handleTouchStart"
+      @touchend="handleTouchEnd"
     >
       <!-- Header -->
       <div class="p-3 flex items-center justify-between">
@@ -189,11 +234,8 @@ defineExpose({ open, close });
             <UiButton
               variant="outline"
               full-width
-              @click="
-                () => {
-                  /* TODO: Google OAuth */
-                }
-              "
+              :disabled="loading"
+              @click="handleOAuthSignIn('google')"
             >
               <NuxtImg
                 src="/img/google.png"
@@ -205,11 +247,8 @@ defineExpose({ open, close });
             <UiButton
               variant="outline"
               full-width
-              @click="
-                () => {
-                  /* TODO: Apple OAuth */
-                }
-              "
+              :disabled="loading"
+              @click="handleOAuthSignIn('apple')"
             >
               <NuxtImg
                 src="/img/apple.png"
@@ -221,11 +260,8 @@ defineExpose({ open, close });
             <UiButton
               variant="outline"
               full-width
-              @click="
-                () => {
-                  /* TODO: LinkedIn OAuth */
-                }
-              "
+              :disabled="loading"
+              @click="handleOAuthSignIn('linkedin')"
             >
               <NuxtImg
                 src="/img/linkedin.png"

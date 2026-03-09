@@ -5,6 +5,7 @@ const router = useRouter();
 const isOpen = ref(false);
 const darkMode = ref(false);
 const notificationsEnabled = ref(true);
+const touchStartY = ref(0);
 
 function open() {
   isOpen.value = true;
@@ -12,6 +13,20 @@ function open() {
 
 function close() {
   isOpen.value = false;
+}
+
+function handleTouchStart(e: TouchEvent) {
+  touchStartY.value = e.touches[0].clientY;
+}
+
+function handleTouchEnd(e: TouchEvent) {
+  const touchEndY = e.changedTouches[0].clientY;
+  const diff = touchEndY - touchStartY.value;
+
+  // Si glissement vers le bas > 80px, fermer la sheet
+  if (diff > 80) {
+    close();
+  }
 }
 
 defineExpose({ open, close });
@@ -45,6 +60,8 @@ function navigateTo(path: string) {
       v-if="isOpen"
       class="fixed left-0 right-0 bottom-0 bg-white rounded-t-2xl shadow-xl"
       style="height: 96vh; z-index: 51"
+      @touchstart="handleTouchStart"
+      @touchend="handleTouchEnd"
     >
       <!-- Handle bar + Terminé -->
       <div class="relative flex items-center justify-end px-3 py-4">
@@ -70,7 +87,9 @@ function navigateTo(path: string) {
           </p>
           <!-- Email -->
           <div class="py-2 flex items-center justify-between">
-            <span class="text-sm text-gray-900">{{ auth.user.value?.email }}</span>
+            <span class="text-sm text-gray-900">{{
+              auth.user.value?.email
+            }}</span>
           </div>
           <!-- Privacy Settings Button -->
           <button
@@ -129,7 +148,9 @@ function navigateTo(path: string) {
             >
               <span
                 class="absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform"
-                :class="notificationsEnabled ? 'translate-x-4' : 'translate-x-0'"
+                :class="
+                  notificationsEnabled ? 'translate-x-4' : 'translate-x-0'
+                "
               />
             </button>
           </div>
@@ -176,7 +197,9 @@ function navigateTo(path: string) {
 
         <!-- Copyright -->
         <div class="py-4 text-center">
-          <p class="text-xs text-gray-400">© 2026 Ainigma. All rights reserved.</p>
+          <p class="text-xs text-gray-400">
+            © 2026 Ainigma. All rights reserved.
+          </p>
         </div>
       </div>
     </div>
